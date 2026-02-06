@@ -49,3 +49,4 @@ coverage/
 
 # Ignore Foundry specific
 foundryconfig.json
+.github/copilot-instructions.md
