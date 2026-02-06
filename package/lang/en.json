@@ -1,0 +1,108 @@
+{
+    "recall-knowledge": {
+        "settings": {
+            "enableRulesEngine": {
+                "name": "Enable Rules Engine",
+                "hint": "Enable the enhanced rules engine functionality for knowledge checks and modifiers."
+            },
+            "debugMode": {
+                "name": "Debug Mode",
+                "hint": "Enable debug logging for troubleshooting module issues."
+            },
+            "autoRollKnowledge": {
+                "name": "Auto-Roll Knowledge Checks",
+                "hint": "Automatically roll knowledge checks when appropriate conditions are met."
+            },
+            "maxKnowledgeAttempts": {
+                "name": "Maximum Knowledge Attempts",
+                "hint": "The maximum number of knowledge check attempts allowed per creature per session."
+            },
+            "chatOutputStyle": {
+                "name": "Chat Output Style",
+                "hint": "How knowledge check results should be displayed in chat.",
+                "simple": "Simple",
+                "detailed": "Detailed",
+                "whisper": "Whisper to GM"
+            },
+            "requireGMApproval": {
+                "name": "Require GM Approval",
+                "hint": "Require GM to approve and select skill for recall knowledge checks."
+            },
+            "revealableInfo": {
+                "name": "Revealable Information Settings",
+                "hint": "Configure what information can be revealed to players and what requires GM selection."
+            },
+            "autoCalculateDC": {
+                "name": "Auto-Calculate DC",
+                "hint": "Automatically calculate recall knowledge DC based on creature level/CR."
+            },
+            "dcCalculationMethod": {
+                "name": "DC Calculation Method",
+                "hint": "Method used to calculate recall knowledge DC.",
+                "level": "Use Creature Level",
+                "cr": "Use Challenge Rating",
+                "custom": "Manual DC Setting"
+            },
+            "includeLoreSkills": {
+                "name": "Include Lore Skills",
+                "hint": "Include character's lore skills in recall knowledge skill selection."
+            }
+        },
+        "ui": {
+            "knowledgeCheck": {
+                "title": "Recall Knowledge",
+                "selectSkill": "Select Knowledge Skill",
+                "arcana": "Arcana",
+                "nature": "Nature",
+                "occultism": "Occultism",
+                "religion": "Religion",
+                "crafting": "Crafting",
+                "lore": "Lore",
+                "roll": "Roll Check",
+                "cancel": "Cancel"
+            },
+            "gmApproval": {
+                "title": "GM: Approve Recall Knowledge",
+                "playerRequest": "{player} wants to recall knowledge about {creature}",
+                "selectSkill": "Select which skill the player should use:",
+                "approve": "Approve & Roll",
+                "deny": "Deny Request",
+                "customDC": "Custom DC (optional):",
+                "availableSkills": "Available Skills:"
+            },
+            "informationReveal": {
+                "title": "Select Information to Reveal",
+                "description": "Choose what the player learns from their {result} recall knowledge check:",
+                "revealSelected": "Reveal Selected",
+                "revealAll": "Reveal All Available",
+                "cancel": "Cancel"
+            },
+            "results": {
+                "criticalSuccess": "Critical Success",
+                "success": "Success",
+                "failure": "Failure",
+                "criticalFailure": "Critical Failure"
+            }
+        },
+        "chat": {
+            "knowledgeCheck": {
+                "title": "Knowledge Check",
+                "attempt": "attempts to recall knowledge about",
+                "result": "Result",
+                "information": "Information Recalled"
+            }
+        },
+        "errors": {
+            "noActor": "No actor selected for knowledge check.",
+            "invalidSkill": "Invalid knowledge skill selected.",
+            "alreadyAttempted": "Maximum knowledge attempts for this creature have been reached.",
+            "noTarget": "No target selected for knowledge check."
+        },
+        "notifications": {
+            "knowledgeShared": "Knowledge information has been shared with other players.",
+            "ruleAdded": "Rule element has been added successfully.",
+            "ruleRemoved": "Rule element has been removed successfully.",
+            "settingsUpdated": "Module settings have been updated."
+        }
+    }
+}
