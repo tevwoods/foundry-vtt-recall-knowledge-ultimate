@@ -101,7 +101,7 @@ Hooks.once('ready', () => {
     const moduleInstance = RecallKnowledgeModule.getInstance();
 
     // Make the module globally available for debugging and API access
-    (globalThis as any).RecallKnowledge = {
+    (globalThis as any).game.RecallKnowledge = {
         module: moduleInstance,
         recallKnowledgeManager: moduleInstance.getRecallKnowledgeManager(),
         MODULE_ID,
