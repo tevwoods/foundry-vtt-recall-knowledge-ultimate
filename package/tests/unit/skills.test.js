@@ -185,10 +185,10 @@ describe('Bestiary Scholar Feature', () => {
     });
 
     test('should add Bestiary Scholar skill when knowledge skills are appropriate', () => {
-        // Replace the settings.get function to return medicine for bestiaryScholarSkill
+        // Replace the settings.get function to return nature for bestiaryScholarSkill
         const originalGet = mockGame.settings.get;
         mockGame.settings.get = (module, key) => {
-            if (key === 'bestiaryScholarSkill') return 'medicine';
+            if (key === 'bestiaryScholarSkill') return 'nature';
             return null;
         };
 
@@ -215,17 +215,17 @@ describe('Bestiary Scholar Feature', () => {
         }
 
         expect(appropriate).toContain('arcana');
-        expect(appropriate).toContain('medicine'); // Bestiary Scholar skill added
+        expect(appropriate).toContain('nature'); // Bestiary Scholar skill added
 
         // Restore original
         mockGame.settings.get = originalGet;
     });
 
     test('should NOT add Bestiary Scholar for Society-only checks', () => {
-        // Replace the settings.get function to return medicine for bestiaryScholarSkill
+        // Replace the settings.get function to return occultism for bestiaryScholarSkill
         const originalGet = mockGame.settings.get;
         mockGame.settings.get = (module, key) => {
-            if (key === 'bestiaryScholarSkill') return 'medicine';
+            if (key === 'bestiaryScholarSkill') return 'occultism';
             return null;
         };
 
@@ -252,17 +252,17 @@ describe('Bestiary Scholar Feature', () => {
         }
 
         expect(appropriate).toContain('society');
-        expect(appropriate).not.toContain('medicine'); // Bestiary Scholar skill NOT added
+        expect(appropriate).not.toContain('occultism'); // Bestiary Scholar skill NOT added
 
         // Restore original
         mockGame.settings.get = originalGet;
     });
 
     test('should add Bestiary Scholar for creatures with multiple knowledge skills', () => {
-        // Replace the settings.get function to return athletics for bestiaryScholarSkill
+        // Replace the settings.get function to return religion for bestiaryScholarSkill
         const originalGet = mockGame.settings.get;
         mockGame.settings.get = (module, key) => {
-            if (key === 'bestiaryScholarSkill') return 'athletics';
+            if (key === 'bestiaryScholarSkill') return 'religion';
             return null;
         };
 
@@ -290,7 +290,7 @@ describe('Bestiary Scholar Feature', () => {
 
         expect(appropriate).toContain('arcana');
         expect(appropriate).toContain('nature');
-        expect(appropriate).toContain('athletics'); // Bestiary Scholar skill added
+        expect(appropriate).toContain('religion'); // Bestiary Scholar skill added
 
         // Restore original
         mockGame.settings.get = originalGet;

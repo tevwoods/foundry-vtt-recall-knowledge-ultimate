@@ -1,6 +1,6 @@
 {
     "name": "recall-knowledge",
-    "version": "1.0.0",
+    "version": "1.0.7",
     "description": "A FoundryVTT module providing enhanced rules engine functionality and knowledge management features.",
     "main": "dist/recall-knowledge.js",
     "type": "module",
@@ -12,10 +12,10 @@
         "lint": "eslint src --ext .ts,.js",
         "lint:fix": "eslint src --ext .ts,.js --fix",
         "format": "prettier --write src/**/*.{ts,js,json}",
-        "prepare": "npm run clean && npm run build",
         "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
         "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
-        "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage"
+        "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+        "release": "node create-release.js"
     },
     "keywords": [
         "foundry-vtt",
@@ -44,5 +44,7 @@
             "verified": 13,
             "maximum": 13
         }
-    }
+    },
+    "manifest": "https://github.com/tevwoods/foundry-vtt-recall-knowledge-ultimate/releases/download/v1.0.7/module.json",
+    "download": "https://github.com/tevwoods/foundry-vtt-recall-knowledge-ultimate/releases/download/v1.0.7/recall-knowledge-v1.0.7.zip"
 }

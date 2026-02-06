@@ -3,6 +3,13 @@
  * This macro should be created in FoundryVTT for players to use
  */
 
+// Get the controlled token
+const controlled = canvas.tokens.controlled;
+if (controlled.length === 0) {
+    ui.notifications.warn("Please select your character token first.");
+    return;
+}
+
 // Get the targeted token
 const targeted = game.user.targets;
 if (targeted.size === 0) {
@@ -10,21 +17,13 @@ if (targeted.size === 0) {
     return;
 }
 
-// Get the controlled token or assigned character
-let actor = null;
-const controlled = canvas.tokens.controlled;
-if (controlled.length > 0) {
-    actor = controlled[0].actor;
-} else {
-    actor = game.user.character;
-}
+const actor = controlled[0].actor;
+const target = Array.from(targeted)[0].actor;
 
-if (!actor) {
-    ui.notifications.error("Please select your character token or ensure you have an assigned character.");
+if (!actor || !target) {
+    ui.notifications.error("Unable to find valid actor and target.");
     return;
 }
-
-const target = Array.from(targeted)[0];
 
 // Check if the Recall Knowledge module is loaded
 if (!game.RecallKnowledge?.module?.recallKnowledgeManager) {
