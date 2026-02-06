@@ -28,8 +28,13 @@ if (!actor || !target) {
 // Check if the Recall Knowledge module is loaded
 if (!game.RecallKnowledge?.module?.recallKnowledgeManager) {
     ui.notifications.error("Recall Knowledge module not found or not loaded.");
+    console.error("Recall Knowledge module check failed. Available:", {
+        "game.RecallKnowledge": !!game.RecallKnowledge,
+        "game.RecallKnowledge.module": !!game.RecallKnowledge?.module,
+        "game.RecallKnowledge.module.recallKnowledgeManager": !!game.RecallKnowledge?.module?.recallKnowledgeManager
+    });
     return;
 }
 
 // Initiate recall knowledge check
-game.RecallKnowledge.module.recallKnowledgeManager.initiateRecallKnowledge(actor, target);
+game.RecallKnowledge.module.recallKnowledgeManager.initiateRecallKnowledge(actor, Array.from(targeted)[0]);

@@ -6,6 +6,8 @@
 const MODULE_ID = 'recall-knowledge';
 const MODULE_TITLE = 'Recall Knowledge';
 
+console.log(`${MODULE_TITLE} | Script loading started...`);
+
 /**
  * Main module initialization
  */
@@ -183,6 +185,13 @@ class RecallKnowledgeModule {
         // Expose on both globalThis and game for compatibility
         globalThis.RecallKnowledge = api;
         game.RecallKnowledge = api;
+
+        console.log(`${MODULE_TITLE} | API exposed:`, {
+            "globalThis.RecallKnowledge": !!globalThis.RecallKnowledge,
+            "game.RecallKnowledge": !!game.RecallKnowledge,
+            "game.RecallKnowledge.module": !!game.RecallKnowledge?.module,
+            "game.RecallKnowledge.module.recallKnowledgeManager": !!game.RecallKnowledge?.module?.recallKnowledgeManager
+        });
     }
 }
 
@@ -214,17 +223,18 @@ class SocketHandler {
 
         console.log('GM Approval Request received:', data);
 
-        // Get current attempt count
+        // Get current attempt count using the same targetId that was sent
         const currentAttempts = this.module?.recallKnowledgeManager?.getRecallAttempts(data.actorId, data.targetId) || 0;
 
-        // Get actor and target names for display
+        // Get actor and target for display names
         const actor = game.actors.get(data.actorId);
-        const target = game.actors.get(data.targetId) || canvas.tokens.get(data.targetId)?.actor;
+        const targetToken = canvas.tokens.get(data.targetId);
+        const targetActor = targetToken?.actor || game.actors.get(data.targetId);
         const actorName = actor?.name || 'Unknown Actor';
-        const targetName = target?.name || 'Unknown Target';
+        const targetName = targetToken?.name || targetActor?.name || 'Unknown Target';
 
-        // Calculate current DC
-        const baseDC = target?.system?.details?.level?.value ? 10 + target.system.details.level.value : 15;
+        // Calculate current DC using target actor's level
+        const baseDC = targetActor?.system?.details?.level?.value ? 10 + targetActor.system.details.level.value : 15;
         const currentDC = baseDC + (currentAttempts * 2);
 
         let content = `
@@ -346,7 +356,8 @@ class SocketHandler {
             ui.notifications.info('GM approved your Recall Knowledge request!');
             // Continue with the recall knowledge process
             const actor = game.actors.get(data.actorId);
-            const target = game.actors.get(data.targetId) || canvas.tokens.get(data.targetId);
+            const targetToken = canvas.tokens.get(data.targetId);
+            const target = targetToken || game.actors.get(data.targetId);
 
             if (actor && target && this.module?.recallKnowledgeManager) {
                 // The attempt count has already been set by the GM, so continue with skill selection
@@ -393,6 +404,19 @@ class RecallKnowledgeManager {
         }
 
         const target = targets[0];
+
+        // Debug target information
+        console.log(`${MODULE_TITLE} | Target DEBUG:`, {
+            'target.name': target.name,
+            'target.id': target.id,
+            'target.x': target.x,
+            'target.y': target.y,
+            'target.scene': target.scene?.name,
+            'target.actor.name': target.actor?.name,
+            'target.actor.id': target.actor?.id,
+            'num_user_targets': game.user.targets.size,
+            'all_target_ids': Array.from(game.user.targets).map(t => ({ id: t.id, name: t.name, x: t.x, y: t.y }))
+        });
 
         // Get actor from provided parameter, controlled token, or assigned character
         let actor = providedActor;
@@ -443,7 +467,7 @@ class RecallKnowledgeManager {
 
         const target = targets[0];
         const targetActor = target.actor || target;
-        const targetId = targetActor.id || targetActor.uuid;
+        const targetId = this.getUniqueTargetId(target);
         const targetName = target.name || target.actor?.name || 'Unknown';
 
         // Get actor
@@ -720,7 +744,7 @@ class RecallKnowledgeManager {
             playerId: game.user.id,
             playerName: game.user.name,
             actorId: actor.id,
-            targetId: target.id,
+            targetId: this.getUniqueTargetId(target),
             availableSkills: availableSkills,
             timestamp: Date.now()
         };
@@ -835,9 +859,9 @@ class RecallKnowledgeManager {
         let modifier = skill.mod ?? skill.totalModifier ?? skill.value ?? 0;
         const skillLabel = skill.label ?? skillKey.charAt(0).toUpperCase() + skillKey.slice(1);
 
-        // Get target IDs for tracking - use actor ID not token ID
+        // Get target IDs for tracking - use unique token ID for each instance
         const targetActor = target.actor || target;
-        const targetId = targetActor.id || targetActor.uuid;
+        const targetId = this.getUniqueTargetId(target);
         const actorId = actor.id;
 
         // Check for Assurance feat on this skill
@@ -881,10 +905,18 @@ class RecallKnowledgeManager {
         }
 
         // Increase DC by 2 for each previous Recall Knowledge attempt (PF2e standard)
+        // DC = base + (2 × number of previous attempts)
         const previousAttempts = this.getRecallAttempts(actorId, targetId);
+        const currentAttemptNumber = previousAttempts + 1;
+        const baseDC = dc;
         dc += (previousAttempts * 2);
 
-        // Note: Attempts will be incremented AFTER the roll completes
+        console.log(`${MODULE_TITLE} | DC Calculation for ${target.name}:`);
+        console.log(`${MODULE_TITLE} | - Base DC: ${baseDC}`);
+        console.log(`${MODULE_TITLE} | - Previous attempts: ${previousAttempts}`);
+        console.log(`${MODULE_TITLE} | - This is attempt #${currentAttemptNumber}`);
+        console.log(`${MODULE_TITLE} | - DC adjustment: +${previousAttempts * 2} (${previousAttempts} attempts × 2)`);
+        console.log(`${MODULE_TITLE} | - Final DC: ${dc}`);
 
         // Perform the roll or use Assurance
         let roll;
@@ -1222,9 +1254,9 @@ class RecallKnowledgeManager {
         let remainingCount = maxCount;
         const selectedInfo = [];
 
-        // Get previously learned information - use actor ID not token ID
+        // Get previously learned information - use unique token ID for each instance
         const targetActor = target.actor || target;
-        const targetId = targetActor.id || targetActor.uuid;
+        const targetId = this.getUniqueTargetId(target);
         const actorId = actor.id;
         const learnedInfo = this.getLearnedInformation(actorId, targetId);
 
@@ -1456,17 +1488,80 @@ class RecallKnowledgeManager {
     }
 
     /**
+     * Get unique identifier for a target token/actor for attempt tracking
+     * This ensures that different instances of the same creature type are tracked separately
+     */
+    getUniqueTargetId(target) {
+        // Debug the target object
+        console.log(`${MODULE_TITLE} | getUniqueTargetId DEBUG:`, {
+            'target.name': target.name,
+            'target.id': target.id,
+            'target.uuid': target.uuid,
+            'target.constructor.name': target.constructor.name,
+            'target._id': target._id,
+            'target.actor?.id': target.actor?.id,
+            'target.actor?.name': target.actor?.name,
+            'isToken': target.constructor.name === 'Token' || target.constructor.name === 'TokenDocument',
+            'isActor': target.constructor.name === 'Actor' || target.constructor.name === 'ActorPF2e'
+        });
+
+        let uniqueId;
+        
+        // For actors that come from tokens, extract the token ID from UUID
+        if (target.uuid && target.uuid.includes('.Token.')) {
+            const tokenMatch = target.uuid.match(/\.Token\.([^.]+)/);
+            if (tokenMatch) {
+                uniqueId = tokenMatch[1]; // Extract token ID
+                console.log(`${MODULE_TITLE} | Using token ID from UUID:`, uniqueId);
+            }
+        }
+        
+        // Fallback: if target has an ID (direct token reference), use that
+        if (!uniqueId && target.id) {
+            // Check if this looks like a token vs actor by checking if target is Token-like
+            if (target.constructor.name.includes('Token')) {
+                uniqueId = target.id;
+                console.log(`${MODULE_TITLE} | Using token target.id:`, uniqueId);
+            } else {
+                // This is an actor, but we want token ID if possible
+                // Try to find a token representing this actor
+                const token = canvas.tokens.placeables.find(t => t.actor?.id === target.id);
+                if (token) {
+                    uniqueId = token.id;
+                    console.log(`${MODULE_TITLE} | Found token for actor, using token.id:`, uniqueId);
+                } else {
+                    uniqueId = target.id; // Fallback to actor ID
+                    console.log(`${MODULE_TITLE} | No token found, using actor target.id:`, uniqueId);
+                }
+            }
+        }
+        
+        // Final fallback to target UUID or _id
+        if (!uniqueId) {
+            uniqueId = target.uuid || target._id;
+            console.log(`${MODULE_TITLE} | Using fallback UUID or _id:`, uniqueId);
+        }
+
+        console.log(`${MODULE_TITLE} | getUniqueTargetId for target:`, target.name, '→', uniqueId);
+        return uniqueId;
+    }
+
+    /**
      * Get number of previous recall knowledge attempts for DC adjustment
      */
     getRecallAttempts(actorId, targetId) {
-        return game.user.getFlag(MODULE_ID, `recallAttempts.${actorId}.${targetId}`) || 0;
+        const attempts = game.user.getFlag(MODULE_ID, `recallAttempts.${actorId}.${targetId}`) || 0;
+        console.log(`${MODULE_TITLE} | getRecallAttempts(${actorId}, ${targetId}) =`, attempts);
+        return attempts;
     }
 
     /**
      * Set recall knowledge attempts to a specific value (for GM adjustment)
      */
     async setRecallAttempts(actorId, targetId, count) {
-        await game.user.setFlag(MODULE_ID, `recallAttempts.${actorId}.${targetId}`, Math.max(0, count));
+        const finalCount = Math.max(0, count);
+        console.log(`${MODULE_TITLE} | setRecallAttempts(${actorId}, ${targetId}, ${count}) → ${finalCount}`);
+        await game.user.setFlag(MODULE_ID, `recallAttempts.${actorId}.${targetId}`, finalCount);
     }
 
     /**
@@ -1474,7 +1569,9 @@ class RecallKnowledgeManager {
      */
     async incrementRecallAttempts(actorId, targetId) {
         const attempts = this.getRecallAttempts(actorId, targetId);
-        await game.user.setFlag(MODULE_ID, `recallAttempts.${actorId}.${targetId}`, attempts + 1);
+        const newCount = attempts + 1;
+        console.log(`${MODULE_TITLE} | incrementRecallAttempts(${actorId}, ${targetId}) ${attempts} → ${newCount}`);
+        await game.user.setFlag(MODULE_ID, `recallAttempts.${actorId}.${targetId}`, newCount);
     }
 
     /**
@@ -2320,12 +2417,40 @@ class ThoroughReportsConfig extends FormApplication {
 let recallKnowledgeModule;
 
 Hooks.once('init', () => {
-    recallKnowledgeModule = new RecallKnowledgeModule();
+    console.log(`${MODULE_TITLE} | Init hook firing...`);
+
+    try {
+        recallKnowledgeModule = new RecallKnowledgeModule();
+
+        // Expose basic API immediately so macros can check for module availability
+        const basicAPI = {
+            module: recallKnowledgeModule,
+            isInitialized: () => recallKnowledgeModule?.initialized || false
+        };
+        globalThis.RecallKnowledge = basicAPI;
+        game.RecallKnowledge = basicAPI;
+
+        console.log(`${MODULE_TITLE} | Module created, basic API exposed`, {
+            "globalThis.RecallKnowledge": !!globalThis.RecallKnowledge,
+            "game.RecallKnowledge": !!game.RecallKnowledge
+        });
+    } catch (error) {
+        console.error(`${MODULE_TITLE} | Error during init:`, error);
+    }
 });
 
 Hooks.once('ready', () => {
+    console.log(`${MODULE_TITLE} | Ready hook firing...`);
+
     if (recallKnowledgeModule) {
-        recallKnowledgeModule.initialize();
+        try {
+            recallKnowledgeModule.initialize();
+            console.log(`${MODULE_TITLE} | Module initialization completed`);
+        } catch (error) {
+            console.error(`${MODULE_TITLE} | Error during ready initialization:`, error);
+        }
+    } else {
+        console.error(`${MODULE_TITLE} | recallKnowledgeModule is null in ready hook`);
     }
 });
 
