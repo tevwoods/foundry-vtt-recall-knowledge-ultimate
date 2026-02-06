@@ -11,10 +11,10 @@ if (targeted.size === 0) {
 }
 
 // Check if the Recall Knowledge module is loaded
-if (!game.RecallKnowledge?.module?.recallKnowledgeManager) {
+if (!game.RecallKnowledge?.showLearnedInformation) {
     ui.notifications.error("Recall Knowledge module not found or not loaded.");
     return;
 }
 
 // Show learned information
-game.RecallKnowledge.module.recallKnowledgeManager.showLearnedInformation();
+game.RecallKnowledge.showLearnedInformation();

@@ -31,6 +31,11 @@ jobs:
     - name: Build module
       run: npm run build
 
+    - name: Copy built files to package
+      run: |
+        cp dist/recall-knowledge.js package/scripts/
+        cp dist/recall-knowledge.js.map package/scripts/ 2>/dev/null || true
+
     - name: Get version from tag
       id: get_version
       run: |
@@ -60,9 +65,6 @@ jobs:
         VERSION: ${{ steps.get_version.outputs.VERSION }}
         TAG: ${{ steps.get_version.outputs.TAG }}
         REPO: ${{ github.repository }}
-
-    - name: Build package directory
-      run: npm run build:package
 
     - name: Update module.json version
       run: |

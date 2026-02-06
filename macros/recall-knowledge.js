@@ -31,7 +31,7 @@ if (!game.RecallKnowledge?.module?.recallKnowledgeManager) {
     console.error("Recall Knowledge module check failed. Available:", {
         "game.RecallKnowledge": !!game.RecallKnowledge,
         "game.RecallKnowledge.module": !!game.RecallKnowledge?.module,
-        \"game.RecallKnowledge.module.recallKnowledgeManager\": !!game.RecallKnowledge?.module?.recallKnowledgeManager
+        "game.RecallKnowledge.module.recallKnowledgeManager": !!game.RecallKnowledge?.module?.recallKnowledgeManager
     });
     return;
 }

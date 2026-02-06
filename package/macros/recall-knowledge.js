@@ -3,13 +3,6 @@
  * This macro should be created in FoundryVTT for players to use
  */
 
-// Get the controlled token
-const controlled = canvas.tokens.controlled;
-if (controlled.length === 0) {
-    ui.notifications.warn("Please select your character token first.");
-    return;
-}
-
 // Get the targeted token
 const targeted = game.user.targets;
 if (targeted.size === 0) {
@@ -17,13 +10,21 @@ if (targeted.size === 0) {
     return;
 }
 
-const actor = controlled[0].actor;
-const target = Array.from(targeted)[0].actor;
+// Get the controlled token or assigned character
+let actor = null;
+const controlled = canvas.tokens.controlled;
+if (controlled.length > 0) {
+    actor = controlled[0].actor;
+} else {
+    actor = game.user.character;
+}
 
-if (!actor || !target) {
-    ui.notifications.error("Unable to find valid actor and target.");
+if (!actor) {
+    ui.notifications.error("Please select your character token or ensure you have an assigned character.");
     return;
 }
+
+const target = Array.from(targeted)[0];
 
 // Check if the Recall Knowledge module is loaded
 if (!game.RecallKnowledge?.module?.recallKnowledgeManager) {
@@ -31,7 +32,7 @@ if (!game.RecallKnowledge?.module?.recallKnowledgeManager) {
     console.error("Recall Knowledge module check failed. Available:", {
         "game.RecallKnowledge": !!game.RecallKnowledge,
         "game.RecallKnowledge.module": !!game.RecallKnowledge?.module,
-        \"game.RecallKnowledge.module.recallKnowledgeManager\": !!game.RecallKnowledge?.module?.recallKnowledgeManager
+        "game.RecallKnowledge.module.recallKnowledgeManager": !!game.RecallKnowledge?.module?.recallKnowledgeManager
     });
     return;
 }

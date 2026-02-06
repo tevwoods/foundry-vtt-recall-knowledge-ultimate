@@ -46,22 +46,6 @@ export class RecallKnowledgeManager {
     private pendingRequests: Map<string, RecallKnowledgeRequest> = new Map();
 
     /**
-     * Get unique identifier for a target (token ID if available, otherwise actor ID)
-     */
-    private getUniqueTargetId(target: any): string {
-        // Try to extract token ID from UUID like "Scene.xxx.Token.yyy"
-        if (target.uuid) {
-            const tokenMatch = target.uuid.match(/\.Token\.([^.]+)/);
-            if (tokenMatch && tokenMatch[1]) {
-                return tokenMatch[1];
-            }
-        }
-
-        // Fallback to token ID or actor ID
-        return target.id || target.actor?.id || target.uuid || 'unknown';
-    }
-
-    /**
      * Initiate a recall knowledge check from a player
      */
     public async initiateRecallKnowledge(actor: any, target: any): Promise<void> {
@@ -247,20 +231,7 @@ export class RecallKnowledgeManager {
         skill: KnowledgeSkill,
         customDC?: number
     ): Promise<RecallKnowledgeResult> {
-        const targetId = this.getUniqueTargetId(target);
-
-        // Get or calculate DC
-        let dc: number;
-        if (customDC !== undefined) {
-            // GM provided a custom DC - store it for this token
-            dc = customDC;
-            const storedDCs = game.user.getFlag('recall-knowledge', 'targetDCs') || {};
-            storedDCs[targetId] = dc;
-            game.user.setFlag('recall-knowledge', 'targetDCs', storedDCs);
-        } else {
-            // Use calculateDefaultDC which will check for stored DC or calculate new one
-            dc = this.calculateDefaultDC(target);
-        }
+        const dc = customDC || this.calculateDefaultDC(target);
 
         // Create the roll
         const roll = new Roll(`1d20 + ${skill.modifier}`);
@@ -424,42 +395,26 @@ export class RecallKnowledgeManager {
     private calculateDefaultDC(target: any): number {
         const settings = (game as any).RecallKnowledge?.settings;
 
-        // Get unique identifier for this specific token
-        const targetId = this.getUniqueTargetId(target);
-
-        // Check if we already have a DC stored for this specific token
-        const storedDCs = game.user.getFlag('recall-knowledge', 'targetDCs') || {};
-        if (storedDCs[targetId] !== undefined) {
-            return storedDCs[targetId];
+        if (!settings?.shouldAutoCalculateDC()) {
+            return 15; // Default DC
         }
 
-        // Calculate new DC
-        let dc = 15; // Default DC
+        const method = settings.getDCCalculationMethod();
+        let level = 0;
 
-        if (settings?.shouldAutoCalculateDC()) {
-            const method = settings.getDCCalculationMethod();
-            let level = 0;
-
-            switch (method) {
-                case 'level':
-                    level = target.system?.level?.value || target.system?.details?.level?.value || 0;
-                    break;
-                case 'cr':
-                    level = target.system?.details?.cr || target.system?.cr || 0;
-                    break;
-                default:
-                    level = 0;
-            }
-
-            // Basic DC calculation: 10 + level
-            dc = Math.max(10, 10 + level);
+        switch (method) {
+            case 'level':
+                level = target.system?.level?.value || target.system?.details?.level?.value || 0;
+                break;
+            case 'cr':
+                level = target.system?.details?.cr || target.system?.cr || 0;
+                break;
+            default:
+                level = 0;
         }
 
-        // Store DC for this specific token
-        storedDCs[targetId] = dc;
-        game.user.setFlag('recall-knowledge', 'targetDCs', storedDCs);
-
-        return dc;
+        // Basic DC calculation: 10 + level
+        return Math.max(10, 10 + level);
     }
 
     /**

@@ -69,64 +69,187 @@
     opacity: 0.8;
 }
 
-/* Chat Message Styles */
+/* Chat Message Styles - Compact Design */
 .chat-message .recall-knowledge-result {
-    background: rgba(0, 123, 255, 0.1);
-    border: 1px solid rgba(0, 123, 255, 0.3);
-    border-radius: 5px;
-    padding: 0.75rem;
-    margin: 0.5rem 0;
+    background: rgba(0, 123, 255, 0.08);
+    border-left: 3px solid rgba(0, 123, 255, 0.5);
+    border-radius: 3px;
+    padding: 0.5rem;
+    margin: 0.35rem 0;
+    font-size: 0.9em;
+    line-height: 1.3;
 }
 
-.chat-message .recall-knowledge-result .result-header {
-    font-weight: bold;
-    margin-bottom: 0.5rem;
+.chat-message .recall-knowledge-result .rk-header {
+    font-size: 0.95em;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
     color: var(--color-text-dark-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
 }
 
-.chat-message .recall-knowledge-result .result-details {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0.25rem 0.5rem;
-    margin-bottom: 0.5rem;
+.chat-message .recall-knowledge-result .rk-badge {
+    background: rgba(108, 117, 125, 0.2);
+    border: 1px solid rgba(108, 117, 125, 0.3);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.75em;
+    font-weight: 500;
+    text-transform: uppercase;
 }
 
-.chat-message .recall-knowledge-result .result-label {
-    font-weight: bold;
+.chat-message .recall-knowledge-result .rk-target {
+    font-size: 0.85em;
+    margin-bottom: 0.25rem;
     color: var(--color-text-dark-secondary);
 }
 
-.chat-message .recall-knowledge-result .result-value {
-    color: var(--color-text-dark-primary);
+.chat-message .recall-knowledge-result .rk-dc-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.35rem;
+    font-size: 0.85em;
 }
 
-.chat-message .recall-knowledge-result .knowledge-information {
-    background: rgba(255, 255, 255, 0.1);
+.chat-message .recall-knowledge-result .rk-dc {
+    color: var(--color-text-dark-secondary);
+}
+
+.chat-message .recall-knowledge-result .rk-degree {
+    padding: 0.15rem 0.5rem;
     border-radius: 3px;
-    padding: 0.5rem;
-    margin-top: 0.5rem;
+    font-size: 0.85em;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.chat-message .recall-knowledge-result .rk-degree.criticalsuccess {
+    background: rgba(40, 167, 69, 0.2);
+    color: rgb(30, 130, 55);
+    border: 1px solid rgba(40, 167, 69, 0.4);
+}
+
+.chat-message .recall-knowledge-result .rk-degree.success {
+    background: rgba(23, 162, 184, 0.2);
+    color: rgb(18, 130, 150);
+    border: 1px solid rgba(23, 162, 184, 0.4);
+}
+
+.chat-message .recall-knowledge-result .rk-degree.failure {
+    background: rgba(255, 193, 7, 0.2);
+    color: rgb(200, 150, 5);
+    border: 1px solid rgba(255, 193, 7, 0.4);
+}
+
+.chat-message .recall-knowledge-result .rk-degree.criticalfailure {
+    background: rgba(220, 53, 69, 0.2);
+    color: rgb(180, 40, 55);
+    border: 1px solid rgba(220, 53, 69, 0.4);
+}
+
+.chat-message .recall-knowledge-result .dice-roll {
+    margin: 0.35rem 0;
+    padding: 0.3rem;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 3px;
+}
+
+.chat-message .recall-knowledge-result .dice-total {
+    font-size: 1.1em;
+    font-weight: 700;
+}
+
+.chat-message .recall-knowledge-result .rk-detail {
+    font-size: 0.8em;
+    color: var(--color-text-dark-secondary);
+    margin: 0.25rem 0;
     font-style: italic;
 }
 
-/* Result Type Specific Colors */
+.chat-message .recall-knowledge-result .rk-info {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.35rem;
+    padding-top: 0.35rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    font-size: 0.85em;
+}
+
+.chat-message .recall-knowledge-result .rk-info-label {
+    color: var(--color-text-dark-secondary);
+    font-weight: 500;
+}
+
+.chat-message .recall-knowledge-result .rk-info-count {
+    background: rgba(0, 123, 255, 0.15);
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    font-weight: 700;
+    border-bottom: 1px dotted rgba(0, 123, 255, 0.6);
+    cursor: help;
+}
+
+.chat-message .recall-knowledge-result .rk-learned {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.chat-message .recall-knowledge-result .rk-learned-label {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: var(--color-text-dark-secondary);
+    margin-bottom: 0.3rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.chat-message .recall-knowledge-result .rk-learned-content {
+    font-size: 0.85em;
+    color: var(--color-text-dark-primary);
+}
+
+.chat-message .recall-knowledge-result .rk-learned-content em {
+    color: var(--color-text-dark-secondary);
+    font-style: italic;
+}
+
+.chat-message .recall-knowledge-result .rk-learned-item {
+    margin: 0.25rem 0;
+    padding: 0.25rem 0.4rem;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    line-height: 1.4;
+}
+
+.chat-message .recall-knowledge-result .rk-learned-item strong {
+    color: var(--color-text-dark-primary);
+    margin-right: 0.25rem;
+}
+
+/* Result Type Specific Border Colors */
 .chat-message .recall-knowledge-result.critical-success {
-    background: rgba(40, 167, 69, 0.1);
-    border-color: rgba(40, 167, 69, 0.3);
+    background: rgba(40, 167, 69, 0.06);
+    border-left-color: rgba(40, 167, 69, 0.6);
 }
 
 .chat-message .recall-knowledge-result.success {
-    background: rgba(23, 162, 184, 0.1);
-    border-color: rgba(23, 162, 184, 0.3);
+    background: rgba(23, 162, 184, 0.06);
+    border-left-color: rgba(23, 162, 184, 0.6);
 }
 
 .chat-message .recall-knowledge-result.failure {
-    background: rgba(255, 193, 7, 0.1);
-    border-color: rgba(255, 193, 7, 0.3);
+    background: rgba(255, 193, 7, 0.06);
+    border-left-color: rgba(255, 193, 7, 0.6);
 }
 
 .chat-message .recall-knowledge-result.critical-failure {
-    background: rgba(220, 53, 69, 0.1);
-    border-color: rgba(220, 53, 69, 0.3);
+    background: rgba(220, 53, 69, 0.06);
+    border-left-color: rgba(220, 53, 69, 0.6);
 }
 
 /* Token HUD Integration */

@@ -88,9 +88,9 @@ try {
     console.log('🔨 Building module...');
     execSync('npm run build', { stdio: 'inherit' });
 
-    // Rebuild package directory with latest assets
-    console.log('📦 Rebuilding package directory...');
-    execSync('npm run build:package', { stdio: 'inherit' });
+    // Copy built files to package
+    console.log('📦 Copying built files to package...');
+    execSync('copy dist\\recall-knowledge.js package\\scripts\\', { stdio: 'inherit' });
 
     // Check if this is a git repository and handle accordingly
     let isGitRepo = false;
