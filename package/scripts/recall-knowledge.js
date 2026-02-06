@@ -197,6 +197,7 @@ class SocketHandler {
 
     setupHandlers() {
         this.messageHandlers.set('GM_APPROVAL_REQUEST', this.handleGMApprovalRequest.bind(this));
+        this.messageHandlers.set('GM_APPROVAL_RESPONSE', this.handleGMApprovalResponse.bind(this));
         this.messageHandlers.set('RECALL_KNOWLEDGE_RESULT', this.handleRecallKnowledgeResult.bind(this));
         this.messageHandlers.set('RECALL_KNOWLEDGE_DENIED', this.handleRecallKnowledgeDenied.bind(this));
     }
@@ -209,9 +210,152 @@ class SocketHandler {
     }
 
     handleGMApprovalRequest(data) {
-        if (game.user.isGM) {
-            console.log('GM Approval Request received:', data);
-            // Handle GM approval request
+        if (!game.user.isGM) return;
+
+        console.log('GM Approval Request received:', data);
+
+        // Get current attempt count
+        const currentAttempts = this.module?.recallKnowledgeManager?.getRecallAttempts(data.actorId, data.targetId) || 0;
+
+        // Get actor and target names for display
+        const actor = game.actors.get(data.actorId);
+        const target = game.actors.get(data.targetId) || canvas.tokens.get(data.targetId)?.actor;
+        const actorName = actor?.name || 'Unknown Actor';
+        const targetName = target?.name || 'Unknown Target';
+
+        // Calculate current DC
+        const baseDC = target?.system?.details?.level?.value ? 10 + target.system.details.level.value : 15;
+        const currentDC = baseDC + (currentAttempts * 2);
+
+        let content = `
+            <div style="margin-bottom: 12px;">
+                <p><strong>Player:</strong> ${data.playerName}</p>
+                <p><strong>Character:</strong> ${actorName}</p>
+                <p><strong>Target:</strong> ${targetName}</p>
+                <p><strong>Available Skills:</strong> ${data.availableSkills.join(', ')}</p>
+            </div>
+            <div style="margin-bottom: 12px; padding: 8px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                <p><strong>Recall Knowledge Attempts:</strong></p>
+                <p style="margin: 4px 0;">Current attempts: <span id="current-attempts">${currentAttempts}</span></p>
+                <p style="margin: 4px 0;">Current DC: <span id="current-dc">${currentDC}</span> (Base: ${baseDC} + ${currentAttempts} attempts × 2)</p>
+                <hr style="margin: 8px 0;">
+                <label for="attempt-input">Adjust attempt count:</label>
+                <input type="number" id="attempt-input" value="${currentAttempts}" min="0" max="20" style="width: 60px; margin-left: 8px;">
+                <button type="button" id="update-attempts" style="margin-left: 8px; padding: 2px 8px;">Update DC</button>
+                <p style="margin: 4px 0; font-size: 0.9em; color: #666;">New DC: <span id="new-dc">${currentDC}</span></p>
+            </div>
+        `;
+
+        const dialog = new Dialog({
+            title: 'GM: Approve Recall Knowledge',
+            content: content,
+            buttons: {
+                approve: {
+                    icon: '<i class="fas fa-check"></i>',
+                    label: 'Approve',
+                    callback: async (html) => {
+                        const finalAttempts = parseInt(html.find('#attempt-input').val()) || 0;
+
+                        // Update the attempt count before proceeding
+                        await this.module?.recallKnowledgeManager?.setRecallAttempts(data.actorId, data.targetId, finalAttempts);
+
+                        const approvalData = {
+                            approved: true,
+                            playerId: data.playerId,
+                            actorId: data.actorId,
+                            targetId: data.targetId,
+                            adjustedAttempts: finalAttempts
+                        };
+
+                        // Send approval back to player
+                        if (this.module?.socketHandler) {
+                            this.module.socketHandler.emit('GM_APPROVAL_RESPONSE', approvalData);
+                        }
+
+                        ui.notifications.info(`Recall Knowledge approved for ${actorName} vs ${targetName} (${finalAttempts} attempts)`);
+                    }
+                },
+                deny: {
+                    icon: '<i class="fas fa-times"></i>',
+                    label: 'Deny',
+                    callback: () => {
+                        const denialData = {
+                            approved: false,
+                            playerId: data.playerId,
+                            reason: 'GM denied the request'
+                        };
+
+                        // Send denial back to player
+                        if (this.module?.socketHandler) {
+                            this.module.socketHandler.emit('GM_APPROVAL_RESPONSE', denialData);
+                        }
+
+                        ui.notifications.info(`Recall Knowledge denied for ${actorName}`);
+                    }
+                }
+            },
+            default: 'approve',
+            close: () => {
+                // Handle dialog close without decision (treat as denial)
+                const denialData = {
+                    approved: false,
+                    playerId: data.playerId,
+                    reason: 'GM closed dialog without decision'
+                };
+
+                if (this.module?.socketHandler) {
+                    this.module.socketHandler.emit('GM_APPROVAL_RESPONSE', denialData);
+                }
+            }
+        }, {
+            width: 450,
+            jQuery: true
+        });
+
+        dialog.render(true);
+
+        // Add event listener for attempt count updates
+        setTimeout(() => {
+            const attemptInput = dialog.element.find('#attempt-input');
+            const updateBtn = dialog.element.find('#update-attempts');
+            const newDcSpan = dialog.element.find('#new-dc');
+
+            const updateDC = () => {
+                const newAttempts = parseInt(attemptInput.val()) || 0;
+                const newDC = baseDC + (newAttempts * 2);
+                newDcSpan.text(newDC);
+            };
+
+            attemptInput.on('input', updateDC);
+            updateBtn.on('click', updateDC);
+        }, 100);
+
+        // Store reference to this module for callbacks
+        if (!this.module) {
+            this.module = globalThis.RecallKnowledge?.module;
+        }
+    }
+
+    handleGMApprovalResponse(data) {
+        // Only handle responses meant for this user
+        if (data.playerId !== game.user.id) return;
+
+        console.log('GM Approval Response received:', data);
+
+        if (data.approved) {
+            ui.notifications.info('GM approved your Recall Knowledge request!');
+            // Continue with the recall knowledge process
+            const actor = game.actors.get(data.actorId);
+            const target = game.actors.get(data.targetId) || canvas.tokens.get(data.targetId);
+
+            if (actor && target && this.module?.recallKnowledgeManager) {
+                // The attempt count has already been set by the GM, so continue with skill selection
+                const targetActor = target.actor || target;
+                const appropriateSkills = this.module.recallKnowledgeManager.getAppropriateSkills(targetActor);
+                this.module.recallKnowledgeManager.showSkillSelectionDialog(actor, target, appropriateSkills);
+            }
+        } else {
+            ui.notifications.warn(`GM denied your Recall Knowledge request: ${data.reason || 'No reason provided'}`);
         }
     }
 
@@ -577,7 +721,8 @@ class RecallKnowledgeManager {
             playerName: game.user.name,
             actorId: actor.id,
             targetId: target.id,
-            availableSkills: availableSkills
+            availableSkills: availableSkills,
+            timestamp: Date.now()
         };
 
         // Emit to GMs
@@ -586,7 +731,7 @@ class RecallKnowledgeManager {
             socketHandler.emit('GM_APPROVAL_REQUEST', request);
         }
 
-        ui.notifications.info('Recall Knowledge request sent to GM for approval.');
+        ui.notifications.info('Recall Knowledge request sent to GM for approval. The GM can adjust your attempt count if needed.');
     }
 
     showSkillSelectionDialog(actor, target, availableSkills) {
@@ -739,8 +884,7 @@ class RecallKnowledgeManager {
         const previousAttempts = this.getRecallAttempts(actorId, targetId);
         dc += (previousAttempts * 2);
 
-        // Increment attempts for future checks
-        await this.incrementRecallAttempts(actorId, targetId);
+        // Note: Attempts will be incremented AFTER the roll completes
 
         // Perform the roll or use Assurance
         let roll;
@@ -870,6 +1014,9 @@ class RecallKnowledgeManager {
     async processRecallKnowledgeResult(actor, target, skillKey, roll, rollTotal, degree, dc, useAssurance, hasAssurance, assuranceValue, thoroughReportsBonus, actorId, targetId, targetActor) {
         const skill = actor.system.skills?.[skillKey];
         const skillLabel = skill.label ?? skillKey.charAt(0).toUpperCase() + skillKey.slice(1);
+
+        // Increment attempts now that the roll has been completed
+        await this.incrementRecallAttempts(actorId, targetId);
 
         // Track creature type for Thorough Reports (only on success or critical success)
         if ((degree === 'success' || degree === 'criticalSuccess') && this.hasThoroughReportsFeat(actor)) {
@@ -1313,6 +1460,13 @@ class RecallKnowledgeManager {
      */
     getRecallAttempts(actorId, targetId) {
         return game.user.getFlag(MODULE_ID, `recallAttempts.${actorId}.${targetId}`) || 0;
+    }
+
+    /**
+     * Set recall knowledge attempts to a specific value (for GM adjustment)
+     */
+    async setRecallAttempts(actorId, targetId, count) {
+        await game.user.setFlag(MODULE_ID, `recallAttempts.${actorId}.${targetId}`, Math.max(0, count));
     }
 
     /**
