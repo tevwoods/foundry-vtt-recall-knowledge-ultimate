@@ -1654,7 +1654,7 @@ Hooks.once("init", async () => {
 Hooks.once("ready", () => {
   console.log(`${MODULE_TITLE} | Module ready`);
   const moduleInstance = RecallKnowledgeModule.getInstance();
-  globalThis.RecallKnowledge = {
+  globalThis.game.RecallKnowledge = {
     module: moduleInstance,
     recallKnowledgeManager: moduleInstance.getRecallKnowledgeManager(),
     MODULE_ID,
