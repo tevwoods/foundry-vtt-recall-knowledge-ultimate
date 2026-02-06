@@ -1,6 +1,6 @@
 {
     "name": "recall-knowledge",
-    "version": "1.0.1",
+    "version": "1.0.3",
     "description": "A FoundryVTT module providing enhanced rules engine functionality and knowledge management features.",
     "main": "dist/recall-knowledge.js",
     "type": "module",
