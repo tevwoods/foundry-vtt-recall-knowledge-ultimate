@@ -4,12 +4,7 @@ A comprehensive FoundryVTT module that enhances the rules engine functionality a
 
 ## Features
 
-- **Enhanced Rules Engine**: Create and manage custom rule elements inspired by PF2e system patterns
 - **Knowledge Management**: Advanced recall knowledge checks with detailed results and tracking
-- **Socket Integration**: Real-time multiplayer support for sharing knowledge and rule updates
-- **Modular Architecture**: Clean, extensible codebase built with TypeScript
-- **Comprehensive API**: Full API access for other modules and macros
-
 ## Installation
 
 ### Automatic Installation (Recommended)

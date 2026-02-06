@@ -498,6 +498,19 @@ class RecallKnowledgeManager {
     __publicField(this, "pendingRequests", /* @__PURE__ */ new Map());
   }
   /**
+   * Get unique identifier for a target (token ID if available, otherwise actor ID)
+   */
+  getUniqueTargetId(target) {
+    var _a;
+    if (target.uuid) {
+      const tokenMatch = target.uuid.match(/\.Token\.([^.]+)/);
+      if (tokenMatch && tokenMatch[1]) {
+        return tokenMatch[1];
+      }
+    }
+    return target.id || ((_a = target.actor) == null ? void 0 : _a.id) || target.uuid || "unknown";
+  }
+  /**
    * Initiate a recall knowledge check from a player
    */
   async initiateRecallKnowledge(actor, target) {
@@ -649,7 +662,16 @@ class RecallKnowledgeManager {
    * Perform the actual recall knowledge roll
    */
   async performRecallKnowledgeRoll(actor, target, skill, customDC) {
-    const dc = customDC || this.calculateDefaultDC(target);
+    const targetId = this.getUniqueTargetId(target);
+    let dc;
+    if (customDC !== void 0) {
+      dc = customDC;
+      const storedDCs = game.user.getFlag("recall-knowledge", "targetDCs") || {};
+      storedDCs[targetId] = dc;
+      game.user.setFlag("recall-knowledge", "targetDCs", storedDCs);
+    } else {
+      dc = this.calculateDefaultDC(target);
+    }
     const roll = new Roll(`1d20 + ${skill.modifier}`);
     await roll.evaluate();
     const total = roll.total || 0;
@@ -775,22 +797,30 @@ class RecallKnowledgeManager {
   calculateDefaultDC(target) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     const settings = (_a = game.RecallKnowledge) == null ? void 0 : _a.settings;
-    if (!(settings == null ? void 0 : settings.shouldAutoCalculateDC())) {
-      return 15;
+    const targetId = this.getUniqueTargetId(target);
+    const storedDCs = game.user.getFlag("recall-knowledge", "targetDCs") || {};
+    if (storedDCs[targetId] !== void 0) {
+      return storedDCs[targetId];
     }
-    const method = settings.getDCCalculationMethod();
-    let level = 0;
-    switch (method) {
-      case "level":
-        level = ((_c = (_b = target.system) == null ? void 0 : _b.level) == null ? void 0 : _c.value) || ((_f = (_e = (_d = target.system) == null ? void 0 : _d.details) == null ? void 0 : _e.level) == null ? void 0 : _f.value) || 0;
-        break;
-      case "cr":
-        level = ((_h = (_g = target.system) == null ? void 0 : _g.details) == null ? void 0 : _h.cr) || ((_i = target.system) == null ? void 0 : _i.cr) || 0;
-        break;
-      default:
-        level = 0;
+    let dc = 15;
+    if (settings == null ? void 0 : settings.shouldAutoCalculateDC()) {
+      const method = settings.getDCCalculationMethod();
+      let level = 0;
+      switch (method) {
+        case "level":
+          level = ((_c = (_b = target.system) == null ? void 0 : _b.level) == null ? void 0 : _c.value) || ((_f = (_e = (_d = target.system) == null ? void 0 : _d.details) == null ? void 0 : _e.level) == null ? void 0 : _f.value) || 0;
+          break;
+        case "cr":
+          level = ((_h = (_g = target.system) == null ? void 0 : _g.details) == null ? void 0 : _h.cr) || ((_i = target.system) == null ? void 0 : _i.cr) || 0;
+          break;
+        default:
+          level = 0;
+      }
+      dc = Math.max(10, 10 + level);
     }
-    return Math.max(10, 10 + level);
+    storedDCs[targetId] = dc;
+    game.user.setFlag("recall-knowledge", "targetDCs", storedDCs);
+    return dc;
   }
   /**
    * Get available information about a creature
