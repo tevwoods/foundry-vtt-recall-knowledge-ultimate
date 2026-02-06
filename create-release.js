@@ -60,18 +60,24 @@ try {
     console.log('📝 Updating package.json...');
     const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
     packageJson.version = version;
+    packageJson.manifest = `https://github.com/tevwoods/foundry-vtt-recall-knowledge-ultimate/releases/download/${tagName}/module.json`;
+    packageJson.download = `https://github.com/tevwoods/foundry-vtt-recall-knowledge-ultimate/releases/download/${tagName}/recall-knowledge-${tagName}.zip`;
     fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 4));
 
     // Update version in module.json
     console.log('📝 Updating module.json...');
     const moduleJson = JSON.parse(fs.readFileSync('module.json', 'utf8'));
     moduleJson.version = version;
+    moduleJson.manifest = `https://github.com/tevwoods/foundry-vtt-recall-knowledge-ultimate/releases/download/${tagName}/module.json`;
+    moduleJson.download = `https://github.com/tevwoods/foundry-vtt-recall-knowledge-ultimate/releases/download/${tagName}/recall-knowledge-${tagName}.zip`;
     fs.writeFileSync('module.json', JSON.stringify(moduleJson, null, 4));
 
     // Update version in package/module.json
     console.log('📝 Updating package/module.json...');
     const packageModuleJson = JSON.parse(fs.readFileSync('package/module.json', 'utf8'));
     packageModuleJson.version = version;
+    packageModuleJson.manifest = `https://github.com/tevwoods/foundry-vtt-recall-knowledge-ultimate/releases/download/${tagName}/module.json`;
+    packageModuleJson.download = `https://github.com/tevwoods/foundry-vtt-recall-knowledge-ultimate/releases/download/${tagName}/recall-knowledge-${tagName}.zip`;
     fs.writeFileSync('package/module.json', JSON.stringify(packageModuleJson, null, 4));
 
     // Run tests

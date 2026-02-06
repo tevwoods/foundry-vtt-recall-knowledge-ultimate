@@ -42,6 +42,30 @@ jobs:
         echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
         echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
+    - name: Update manifest metadata
+      run: |
+        node - <<'NODE'
+        const fs = require('fs');
+        const version = process.env.VERSION;
+        const tag = process.env.TAG;
+        const repo = process.env.REPO;
+        const manifestUrl = `https://github.com/${repo}/releases/download/${tag}/module.json`;
+        const downloadUrl = `https://github.com/${repo}/releases/download/${tag}/recall-knowledge-${tag}.zip`;
+
+        for (const file of ['module.json', 'package/module.json', 'package.json']) {
+          if (!fs.existsSync(file)) continue;
+          const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+          data.version = version;
+          if ('manifest' in data) data.manifest = manifestUrl;
+          if ('download' in data) data.download = downloadUrl;
+          fs.writeFileSync(file, JSON.stringify(data, null, 4));
+        }
+        NODE
+      env:
+        VERSION: ${{ steps.get_version.outputs.VERSION }}
+        TAG: ${{ steps.get_version.outputs.TAG }}
+        REPO: ${{ github.repository }}
+
     - name: Update module.json version
       run: |
         sed -i 's/"version": "[^"]*"/"version": "${{ steps.get_version.outputs.VERSION }}"/' package/module.json
