@@ -1,2471 +1,1664 @@
-/**
- * Recall Knowledge - FoundryVTT Module
- * A comprehensive module for enhanced rules engine functionality and knowledge management
- */
-
-const MODULE_ID = 'recall-knowledge';
-const MODULE_TITLE = 'Recall Knowledge';
-
-console.log(`${MODULE_TITLE} | Script loading started...`);
-
-/**
- * Main module initialization
- */
-class RecallKnowledgeModule {
-    constructor() {
-        this.settings = null;
-        this.socketHandler = null;
-        this.recallKnowledgeManager = null;
-        this.initialized = false;
-    }
-
-    /**
-     * Initialize the module
-     */
-    async initialize() {
-        console.log(`${MODULE_TITLE} | Initializing module...`);
-
-        try {
-            // Initialize settings
-            this.registerSettings();
-
-            // Initialize socket handler
-            this.socketHandler = new SocketHandler();
-
-            // Initialize recall knowledge manager
-            this.recallKnowledgeManager = new RecallKnowledgeManager();
-
-            // Register hooks
-            this.registerHooks();
-
-            // Expose API
-            this.exposeAPI();
-
-            this.initialized = true;
-            console.log(`${MODULE_TITLE} | Module initialized successfully`);
-        } catch (error) {
-            console.error(`${MODULE_TITLE} | Initialization failed:`, error);
+var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+const MODULE_ID = "recall-knowledge";
+const MODULE_TITLE = "Recall Knowledge";
+class ModuleAPI {
+  constructor() {
+    __publicField(this, "rulesEngine");
+    __publicField(this, "socketHandler");
+    __publicField(this, "settings");
+  }
+  /**
+   * Setup the API for external access
+   */
+  setupAPI() {
+    console.log(`${MODULE_ID} | Setting up module API`);
+    const api = {
+      moduleId: MODULE_ID,
+      version: this.getModuleVersion(),
+      settings: {
+        get: (key) => {
+          var _a;
+          return (_a = this.settings) == null ? void 0 : _a.getSetting(key);
+        },
+        set: (key, value) => {
+          var _a;
+          return ((_a = this.settings) == null ? void 0 : _a.setSetting(key, value)) || Promise.resolve(void 0);
+        },
+        isRulesEngineEnabled: () => {
+          var _a;
+          return ((_a = this.settings) == null ? void 0 : _a.isRulesEngineEnabled()) || false;
+        },
+        isDebugMode: () => {
+          var _a;
+          return ((_a = this.settings) == null ? void 0 : _a.isDebugMode()) || false;
         }
+      },
+      rules: {
+        addRuleElement: (element) => {
+          var _a;
+          return (_a = this.rulesEngine) == null ? void 0 : _a.addRuleElement(element);
+        },
+        removeRuleElement: (key) => {
+          var _a;
+          return ((_a = this.rulesEngine) == null ? void 0 : _a.removeRuleElement(key)) || false;
+        },
+        getRuleElement: (key) => {
+          var _a;
+          return (_a = this.rulesEngine) == null ? void 0 : _a.getRuleElement(key);
+        },
+        getAllRuleElements: () => {
+          var _a;
+          return ((_a = this.rulesEngine) == null ? void 0 : _a.getAllRuleElements()) || [];
+        },
+        createKnowledgeRule: (config) => this.createKnowledgeRule(config),
+        createModifierRule: (config) => this.createModifierRule(config)
+      },
+      socket: {
+        shareKnowledgeCheck: (actorId, checkType, result) => {
+          var _a;
+          return (_a = this.socketHandler) == null ? void 0 : _a.shareKnowledgeCheck(actorId, checkType, result);
+        },
+        shareKnowledge: (knowledge, targetActorId, targets) => {
+          var _a;
+          return (_a = this.socketHandler) == null ? void 0 : _a.shareKnowledge(knowledge, targetActorId, targets);
+        },
+        updateRules: (ruleElement, action) => {
+          var _a;
+          return (_a = this.socketHandler) == null ? void 0 : _a.updateRules(ruleElement, action);
+        }
+      },
+      knowledge: {
+        performCheck: (actor, checkType, options) => this.performKnowledgeCheck(actor, checkType, options),
+        getKnownInformation: (actor) => this.getKnownInformation(actor),
+        addKnowledge: (actor, knowledge) => this.addKnowledge(actor, knowledge),
+        removeKnowledge: (actor, knowledgeId) => this.removeKnowledge(actor, knowledgeId)
+      },
+      utils: {
+        isKnowledgeSkill: (skill) => this.isKnowledgeSkill(skill),
+        getDCForCreature: (creature) => this.getDCForCreature(creature),
+        formatKnowledgeResult: (result) => this.formatKnowledgeResult(result)
+      }
+    };
+    globalThis.RecallKnowledgeAPI = api;
+    game.RecallKnowledge = api;
+    console.log(`${MODULE_ID} | API registered globally as RecallKnowledgeAPI and game.RecallKnowledge`);
+  }
+  /**
+   * Set references to other module components
+   */
+  setComponents(rulesEngine, socketHandler, settings) {
+    this.rulesEngine = rulesEngine;
+    this.socketHandler = socketHandler;
+    this.settings = settings;
+  }
+  // =============================================================================
+  // API Implementation Methods
+  // =============================================================================
+  /**
+   * Get the module version
+   */
+  getModuleVersion() {
+    const module = game.modules.get(MODULE_ID);
+    return (module == null ? void 0 : module.version) || "1.0.0";
+  }
+  /**
+   * Create a knowledge rule element with defaults
+   */
+  createKnowledgeRule(config) {
+    return {
+      key: config.key || "knowledge.custom",
+      label: config.label || "Custom Knowledge Check",
+      selector: config.selector || "check",
+      dc: config.dc || 15,
+      type: config.type || "arcana",
+      priority: config.priority || 10,
+      success: config.success || "You recall some information.",
+      criticalSuccess: config.criticalSuccess || "You recall detailed information.",
+      failure: config.failure || "You cannot recall anything useful.",
+      criticalFailure: config.criticalFailure || "You recall false information.",
+      ...config
+    };
+  }
+  /**
+   * Create a modifier rule element with defaults
+   */
+  createModifierRule(config) {
+    return {
+      key: config.key || "modifier.custom",
+      label: config.label || "Custom Modifier",
+      selector: config.selector || "skill-check",
+      type: config.type || "circumstance",
+      value: config.value || 0,
+      priority: config.priority || 20,
+      ...config
+    };
+  }
+  /**
+   * Perform a knowledge check
+   */
+  async performKnowledgeCheck(actor, checkType, options = {}) {
+    var _a, _b;
+    console.log(`${MODULE_ID} | Performing knowledge check: ${checkType} for ${actor.name}`);
+    if (!actor || !checkType) {
+      throw new Error("Actor and checkType are required for knowledge checks");
     }
-
-    /**
-     * Register module settings
-     */
-    registerSettings() {
-        // Enable/disable GM approval requirement
-        game.settings.register(MODULE_ID, 'requireGMApproval', {
-            name: 'Require GM Approval',
-            hint: 'When enabled, GMs must approve all recall knowledge attempts.',
-            scope: 'world',
-            config: true,
-            type: Boolean,
-            default: true
-        });
-
-        // Auto-calculate DC setting
-        game.settings.register(MODULE_ID, 'autoCalculateDC', {
-            name: 'Auto-Calculate DC',
-            hint: 'Automatically calculate DC based on creature level.',
-            scope: 'world',
-            config: true,
-            type: Boolean,
-            default: true
-        });
-
-        // Revealable information configuration
-        game.settings.register(MODULE_ID, 'revealableInfo', {
-            name: 'Revealable Information',
-            hint: 'Configure what information can be revealed.',
-            scope: 'world',
-            config: false,
-            type: Object,
-            default: {
-                criticalSuccess: ['name', 'type', 'level', 'ac', 'hp', 'saves', 'resistances', 'weaknesses', 'immunities', 'traits', 'abilities'],
-                success: ['name', 'type', 'level', 'ac', 'traits'],
-                failure: ['name', 'type'],
-                criticalFailure: []
-            }
-        });
-
-        // Hide roll results from player
-        game.settings.register(MODULE_ID, 'hideRollFromPlayer', {
-            name: 'Hide Roll Results from Player',
-            hint: 'When enabled, players will not see their roll results. Only the GM will see the actual roll.',
-            scope: 'world',
-            config: true,
-            type: Boolean,
-            default: false
-        });
-
-        // Enable false information on critical failure
-        game.settings.register(MODULE_ID, 'falseInfoOnCritFail', {
-            name: 'False Information on Critical Failure',
-            hint: 'When enabled, players who critically fail will receive false information instead of being told they failed.',
-            scope: 'world',
-            config: true,
-            type: Boolean,
-            default: false
-        });
-
-        // Share knowledge with party
-        game.settings.register(MODULE_ID, 'shareWithParty', {
-            name: 'Share Knowledge with Party',
-            hint: 'When enabled, all recalled information is automatically shared with party members. Party members can see all information learned by any party member.',
-            scope: 'world',
-            config: true,
-            type: Boolean,
-            default: false
-        });
-
-        // Bestiary Scholar skill choice (per-user)
-        game.settings.register(MODULE_ID, 'bestiaryScholarSkill', {
-            name: 'Bestiary Scholar Skill',
-            hint: 'If you have the Bestiary Scholar feat, select which of the four core knowledge skills you use to identify all creatures.',
-            scope: 'client',
-            config: true,
-            type: String,
-            default: '',
-            choices: {
-                '': 'None (No Bestiary Scholar)',
-                'arcana': 'Arcana',
-                'nature': 'Nature',
-                'occultism': 'Occultism',
-                'religion': 'Religion'
-            }
-        });
-
-        // Thorough Reports configuration menu
-        game.settings.registerMenu(MODULE_ID, 'thoroughReportsConfig', {
-            name: 'Configure Thorough Reports',
-            label: 'Manage Creature Types',
-            hint: 'Configure which creature types you have already identified for the Thorough Reports feat.',
-            icon: 'fas fa-book',
-            type: ThoroughReportsConfig,
-            restricted: false
-        });
+    if (!this.isKnowledgeSkill(checkType)) {
+      throw new Error(`${checkType} is not a valid knowledge skill`);
     }
-
-    /**
-     * Register hooks
-     */
-    registerHooks() {
-        // Ready hook
-        Hooks.once('ready', () => {
-            console.log(`${MODULE_TITLE} | Ready`);
-        });
-
-        // Socket message handler
-        Hooks.on('socketlib.receiveMessage', (userId, data) => {
-            if (this.socketHandler) {
-                this.socketHandler.handleMessage(data);
-            }
-        });
+    const skillModifier = this.getSkillModifier(actor, checkType);
+    const dc = options.dc || this.getDCForCreature(options.target);
+    const roll = new Roll(`1d20 + ${skillModifier}`);
+    await roll.evaluate();
+    const total = roll.total || 0;
+    const result = this.evaluateKnowledgeResult(total, dc);
+    const checkResult = {
+      actor: actor.id,
+      checkType,
+      roll,
+      total,
+      dc,
+      result,
+      timestamp: Date.now()
+    };
+    if ((_a = this.settings) == null ? void 0 : _a.getSetting("shareKnowledge")) {
+      (_b = this.socketHandler) == null ? void 0 : _b.shareKnowledgeCheck(actor.id, checkType, checkResult);
     }
-
-    /**
-     * Expose module API
-     */
-    exposeAPI() {
-        const api = {
-            module: this,
-            initiateRecallKnowledge: () => {
-                if (this.recallKnowledgeManager) {
-                    return this.recallKnowledgeManager.initiateRecallKnowledge();
-                }
-            },
-            showLearnedInformation: () => {
-                if (this.recallKnowledgeManager) {
-                    return this.recallKnowledgeManager.showLearnedInformation();
-                }
-            },
-            getSettings: () => this.settings,
-            isInitialized: () => this.initialized
-        };
-
-        // Expose on both globalThis and game for compatibility
-        globalThis.RecallKnowledge = api;
-        game.RecallKnowledge = api;
-
-        console.log(`${MODULE_TITLE} | API exposed:`, {
-            "globalThis.RecallKnowledge": !!globalThis.RecallKnowledge,
-            "game.RecallKnowledge": !!game.RecallKnowledge,
-            "game.RecallKnowledge.module": !!game.RecallKnowledge?.module,
-            "game.RecallKnowledge.module.recallKnowledgeManager": !!game.RecallKnowledge?.module?.recallKnowledgeManager
-        });
+    return checkResult;
+  }
+  /**
+   * Get known information for an actor
+   */
+  getKnownInformation(actor) {
+    const knowledgeFlag = actor.getFlag(MODULE_ID, "knownInformation") || [];
+    return knowledgeFlag;
+  }
+  /**
+   * Add knowledge to an actor
+   */
+  addKnowledge(actor, knowledge) {
+    const currentKnowledge = this.getKnownInformation(actor);
+    const updatedKnowledge = [...currentKnowledge, { ...knowledge, id: foundry.utils.randomID() }];
+    actor.setFlag(MODULE_ID, "knownInformation", updatedKnowledge);
+  }
+  /**
+   * Remove knowledge from an actor
+   */
+  removeKnowledge(actor, knowledgeId) {
+    const currentKnowledge = this.getKnownInformation(actor);
+    const filteredKnowledge = currentKnowledge.filter((k) => k.id !== knowledgeId);
+    if (filteredKnowledge.length !== currentKnowledge.length) {
+      actor.setFlag(MODULE_ID, "knownInformation", filteredKnowledge);
+      return true;
     }
+    return false;
+  }
+  /**
+   * Check if a skill is a knowledge skill
+   */
+  isKnowledgeSkill(skill) {
+    const knowledgeSkills = ["arcana", "nature", "occultism", "religion", "crafting", "lore"];
+    return knowledgeSkills.includes(skill.toLowerCase());
+  }
+  /**
+   * Get DC for a creature (simplified implementation)
+   */
+  getDCForCreature(creature) {
+    var _a, _b;
+    if (!creature) return 15;
+    const level = ((_b = (_a = creature.system) == null ? void 0 : _a.level) == null ? void 0 : _b.value) || 0;
+    return 10 + level;
+  }
+  /**
+   * Format knowledge check result
+   */
+  formatKnowledgeResult(result) {
+    if (!result) return "";
+    const { checkType, total, dc, result: outcome } = result;
+    return `${checkType.charAt(0).toUpperCase() + checkType.slice(1)} Check: ${total} vs DC ${dc} (${outcome})`;
+  }
+  /**
+   * Get skill modifier for an actor
+   */
+  getSkillModifier(actor, skill) {
+    var _a, _b, _c;
+    return ((_c = (_b = (_a = actor.system) == null ? void 0 : _a.skills) == null ? void 0 : _b[skill]) == null ? void 0 : _c.mod) || 0;
+  }
+  /**
+   * Evaluate knowledge check result
+   */
+  evaluateKnowledgeResult(total, dc) {
+    const margin = total - dc;
+    if (margin >= 10) return "criticalSuccess";
+    if (margin >= 0) return "success";
+    if (margin >= -10) return "failure";
+    return "criticalFailure";
+  }
 }
-
-/**
- * Simple Socket Handler
- */
-class SocketHandler {
-    constructor() {
-        this.messageHandlers = new Map();
-        this.setupHandlers();
+class HookManager {
+  constructor() {
+    __publicField(this, "registeredHooks", /* @__PURE__ */ new Map());
+  }
+  /**
+   * Setup all module hooks
+   */
+  setupHooks() {
+    console.log(`${MODULE_ID} | Setting up hooks`);
+    this.registerHook("init", this.onInit.bind(this));
+    this.registerHook("ready", this.onReady.bind(this));
+    this.registerHook("canvasReady", this.onCanvasReady.bind(this));
+    this.registerHook("createActor", this.onCreateActor.bind(this));
+    this.registerHook("updateActor", this.onUpdateActor.bind(this));
+    this.registerHook("deleteActor", this.onDeleteActor.bind(this));
+    this.registerHook("createItem", this.onCreateItem.bind(this));
+    this.registerHook("updateItem", this.onUpdateItem.bind(this));
+    this.registerHook("deleteItem", this.onDeleteItem.bind(this));
+    this.registerHook("createChatMessage", this.onCreateChatMessage.bind(this));
+    this.registerHook("renderChatMessage", this.onRenderChatMessage.bind(this));
+    this.registerHook("combatStart", this.onCombatStart.bind(this));
+    this.registerHook("combatTurn", this.onCombatTurn.bind(this));
+    this.registerHook("combatEnd", this.onCombatEnd.bind(this));
+    this.registerHook("controlToken", this.onControlToken.bind(this));
+    this.registerHook("updateToken", this.onUpdateToken.bind(this));
+    this.registerHook("diceSoNice.diceRolled", this.onDiceRolled.bind(this));
+  }
+  /**
+   * Register a hook
+   */
+  registerHook(event, callback, once = false) {
+    if (!this.registeredHooks.has(event)) {
+      this.registeredHooks.set(event, []);
     }
-
-    setupHandlers() {
-        this.messageHandlers.set('GM_APPROVAL_REQUEST', this.handleGMApprovalRequest.bind(this));
-        this.messageHandlers.set('GM_APPROVAL_RESPONSE', this.handleGMApprovalResponse.bind(this));
-        this.messageHandlers.set('RECALL_KNOWLEDGE_RESULT', this.handleRecallKnowledgeResult.bind(this));
-        this.messageHandlers.set('RECALL_KNOWLEDGE_DENIED', this.handleRecallKnowledgeDenied.bind(this));
-    }
-
-    handleMessage(data) {
-        const handler = this.messageHandlers.get(data.type);
-        if (handler) {
-            handler(data);
-        }
-    }
-
-    handleGMApprovalRequest(data) {
-        if (!game.user.isGM) return;
-
-        console.log('GM Approval Request received:', data);
-
-        // Get current attempt count using the same targetId that was sent
-        const currentAttempts = this.module?.recallKnowledgeManager?.getRecallAttempts(data.actorId, data.targetId) || 0;
-
-        // Get actor and target for display names
-        const actor = game.actors.get(data.actorId);
-        const targetToken = canvas.tokens.get(data.targetId);
-        const targetActor = targetToken?.actor || game.actors.get(data.targetId);
-        const actorName = actor?.name || 'Unknown Actor';
-        const targetName = targetToken?.name || targetActor?.name || 'Unknown Target';
-
-        // Calculate current DC using target actor's level
-        const baseDC = targetActor?.system?.details?.level?.value ? 10 + targetActor.system.details.level.value : 15;
-        const currentDC = baseDC + (currentAttempts * 2);
-
-        let content = `
-            <div style="margin-bottom: 12px;">
-                <p><strong>Player:</strong> ${data.playerName}</p>
-                <p><strong>Character:</strong> ${actorName}</p>
-                <p><strong>Target:</strong> ${targetName}</p>
-                <p><strong>Available Skills:</strong> ${data.availableSkills.join(', ')}</p>
-            </div>
-            <div style="margin-bottom: 12px; padding: 8px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
-                <p><strong>Recall Knowledge Attempts:</strong></p>
-                <p style="margin: 4px 0;">Current attempts: <span id="current-attempts">${currentAttempts}</span></p>
-                <p style="margin: 4px 0;">Current DC: <span id="current-dc">${currentDC}</span> (Base: ${baseDC} + ${currentAttempts} attempts × 2)</p>
-                <hr style="margin: 8px 0;">
-                <label for="attempt-input">Adjust attempt count:</label>
-                <input type="number" id="attempt-input" value="${currentAttempts}" min="0" max="20" style="width: 60px; margin-left: 8px;">
-                <button type="button" id="update-attempts" style="margin-left: 8px; padding: 2px 8px;">Update DC</button>
-                <p style="margin: 4px 0; font-size: 0.9em; color: #666;">New DC: <span id="new-dc">${currentDC}</span></p>
-            </div>
-        `;
-
-        const dialog = new Dialog({
-            title: 'GM: Approve Recall Knowledge',
-            content: content,
-            buttons: {
-                approve: {
-                    icon: '<i class="fas fa-check"></i>',
-                    label: 'Approve',
-                    callback: async (html) => {
-                        const finalAttempts = parseInt(html.find('#attempt-input').val()) || 0;
-
-                        // Update the attempt count before proceeding
-                        await this.module?.recallKnowledgeManager?.setRecallAttempts(data.actorId, data.targetId, finalAttempts);
-
-                        const approvalData = {
-                            approved: true,
-                            playerId: data.playerId,
-                            actorId: data.actorId,
-                            targetId: data.targetId,
-                            adjustedAttempts: finalAttempts
-                        };
-
-                        // Send approval back to player
-                        if (this.module?.socketHandler) {
-                            this.module.socketHandler.emit('GM_APPROVAL_RESPONSE', approvalData);
-                        }
-
-                        ui.notifications.info(`Recall Knowledge approved for ${actorName} vs ${targetName} (${finalAttempts} attempts)`);
-                    }
-                },
-                deny: {
-                    icon: '<i class="fas fa-times"></i>',
-                    label: 'Deny',
-                    callback: () => {
-                        const denialData = {
-                            approved: false,
-                            playerId: data.playerId,
-                            reason: 'GM denied the request'
-                        };
-
-                        // Send denial back to player
-                        if (this.module?.socketHandler) {
-                            this.module.socketHandler.emit('GM_APPROVAL_RESPONSE', denialData);
-                        }
-
-                        ui.notifications.info(`Recall Knowledge denied for ${actorName}`);
-                    }
-                }
-            },
-            default: 'approve',
-            close: () => {
-                // Handle dialog close without decision (treat as denial)
-                const denialData = {
-                    approved: false,
-                    playerId: data.playerId,
-                    reason: 'GM closed dialog without decision'
-                };
-
-                if (this.module?.socketHandler) {
-                    this.module.socketHandler.emit('GM_APPROVAL_RESPONSE', denialData);
-                }
-            }
-        }, {
-            width: 450,
-            jQuery: true
-        });
-
-        dialog.render(true);
-
-        // Add event listener for attempt count updates
-        setTimeout(() => {
-            const attemptInput = dialog.element.find('#attempt-input');
-            const updateBtn = dialog.element.find('#update-attempts');
-            const newDcSpan = dialog.element.find('#new-dc');
-
-            const updateDC = () => {
-                const newAttempts = parseInt(attemptInput.val()) || 0;
-                const newDC = baseDC + (newAttempts * 2);
-                newDcSpan.text(newDC);
-            };
-
-            attemptInput.on('input', updateDC);
-            updateBtn.on('click', updateDC);
-        }, 100);
-
-        // Store reference to this module for callbacks
-        if (!this.module) {
-            this.module = globalThis.RecallKnowledge?.module;
-        }
-    }
-
-    handleGMApprovalResponse(data) {
-        // Only handle responses meant for this user
-        if (data.playerId !== game.user.id) return;
-
-        console.log('GM Approval Response received:', data);
-
-        if (data.approved) {
-            ui.notifications.info('GM approved your Recall Knowledge request!');
-            // Continue with the recall knowledge process
-            const actor = game.actors.get(data.actorId);
-            const targetToken = canvas.tokens.get(data.targetId);
-            const target = targetToken || game.actors.get(data.targetId);
-
-            if (actor && target && this.module?.recallKnowledgeManager) {
-                // The attempt count has already been set by the GM, so continue with skill selection
-                const targetActor = target.actor || target;
-                const appropriateSkills = this.module.recallKnowledgeManager.getAppropriateSkills(targetActor);
-                this.module.recallKnowledgeManager.showSkillSelectionDialog(actor, target, appropriateSkills);
-            }
-        } else {
-            ui.notifications.warn(`GM denied your Recall Knowledge request: ${data.reason || 'No reason provided'}`);
-        }
-    }
-
-    handleRecallKnowledgeResult(data) {
-        console.log('Recall Knowledge Result received:', data);
-        // Handle recall knowledge result
-    }
-
-    handleRecallKnowledgeDenied(data) {
-        console.log('Recall Knowledge Denied:', data);
-        // Handle recall knowledge denial
-    }
-
-    emit(type, data) {
-        if (game.socket) {
-            game.socket.emit('module.recall-knowledge', { type, ...data });
-        }
-    }
-}
-
-/**
- * Recall Knowledge Manager
- */
-class RecallKnowledgeManager {
-    constructor() {
-        this.pendingRequests = new Map();
-    }
-
-    async initiateRecallKnowledge(providedActor = null, providedTarget = null) {
-        // Check if user has a target
-        const targets = providedTarget ? [providedTarget] : Array.from(game.user.targets);
-        if (targets.length === 0) {
-            ui.notifications.warn('Please target a creature first.');
-            return;
-        }
-
-        const target = targets[0];
-
-        // Debug target information
-        console.log(`${MODULE_TITLE} | Target DEBUG:`, {
-            'target.name': target.name,
-            'target.id': target.id,
-            'target.x': target.x,
-            'target.y': target.y,
-            'target.scene': target.scene?.name,
-            'target.actor.name': target.actor?.name,
-            'target.actor.id': target.actor?.id,
-            'num_user_targets': game.user.targets.size,
-            'all_target_ids': Array.from(game.user.targets).map(t => ({ id: t.id, name: t.name, x: t.x, y: t.y }))
-        });
-
-        // Get actor from provided parameter, controlled token, or assigned character
-        let actor = providedActor;
-        if (!actor) {
-            const controlled = canvas.tokens.controlled;
-            if (controlled.length > 0) {
-                actor = controlled[0].actor;
-            } else {
-                actor = game.user.character;
-            }
-        }
-
-        if (!actor) {
-            ui.notifications.error('No character selected.');
-            return;
-        }
-
-        // Get available knowledge skills
-        const availableSkills = this.getKnowledgeSkills(actor);
-
-        if (availableSkills.length === 0) {
-            ui.notifications.warn('No knowledge skills available.');
-            return;
-        }
-
-        // Check if GM approval is required
-        const requireGMApproval = game.settings.get(MODULE_ID, 'requireGMApproval');
-
-        if (requireGMApproval && game.user.isGM === false) {
-            // Send approval request to GM
-            this.sendGMApprovalRequest(actor, target, availableSkills);
-        } else {
-            // Direct skill selection
-            this.showSkillSelectionDialog(actor, target, availableSkills);
-        }
-    }
-
-    /**
-     * Show all learned information about a targeted creature
-     */
-    showLearnedInformation() {
-        // Check if user has a target
-        const targets = Array.from(game.user.targets);
-        if (targets.length === 0) {
-            ui.notifications.warn('Please target a creature first.');
-            return;
-        }
-
-        const target = targets[0];
-        const targetActor = target.actor || target;
-        const targetId = this.getUniqueTargetId(target);
-        const targetName = target.name || target.actor?.name || 'Unknown';
-
-        // Get actor
-        let actor = null;
-        const controlled = canvas.tokens.controlled;
-        if (controlled.length > 0) {
-            actor = controlled[0].actor;
-        } else {
-            actor = game.user.character;
-        }
-
-        if (!actor) {
-            ui.notifications.error('No character selected.');
-            return;
-        }
-
-        const actorId = actor.id;
-        const shareWithParty = game.settings.get(MODULE_ID, 'shareWithParty');
-
-        console.log(`${MODULE_TITLE} | Viewing learned info for actor ${actorId}, target ${targetId}`);
-        console.log(`${MODULE_TITLE} | Party sharing: ${shareWithParty}`);
-
-        // Get learned information
-        let learnedInfo = [];
-        let infoByLearner = new Map(); // Track who learned what
-
-        if (shareWithParty) {
-            // Find "The Party" actor (PF2e party system)
-            const partyActor = game.actors.find(a => a.type === "party" || a.name === "The Party");
-            console.log(`${MODULE_TITLE} | Party actor:`, partyActor?.name);
-
-            // Get party members from the party actor
-            const partyActors = partyActor?.system?.details?.members ? Array.from(partyActor.system.details.members).map(m => game.actors.get(m.uuid.split('.').pop())) : [];
-            console.log(`${MODULE_TITLE} | Found ${partyActors.length} party members:`, partyActors.map(a => a?.name));
-
-            for (const partyActor of partyActors) {
-                console.log(`${MODULE_TITLE} | Checking party member: ${partyActor.name} (${partyActor.id})`);
-
-                // Check all users for this actor's learned information
-                for (const user of game.users) {
-                    const userLearnedInfo = user.getFlag(MODULE_ID, `learnedInfo.${partyActor.id}.${targetId}`) || [];
-                    if (userLearnedInfo.length > 0) {
-                        console.log(`${MODULE_TITLE} | User ${user.name} has info for ${partyActor.name}:`, userLearnedInfo);
-
-                        userLearnedInfo.forEach(info => {
-                            if (!learnedInfo.includes(info)) {
-                                learnedInfo.push(info);
-                            }
-                            if (!infoByLearner.has(info)) {
-                                infoByLearner.set(info, []);
-                            }
-                            if (!infoByLearner.get(info).includes(partyActor.name)) {
-                                infoByLearner.get(info).push(partyActor.name);
-                            }
-                        });
-                    }
-                }
-            }
-            console.log(`${MODULE_TITLE} | Final learned info:`, learnedInfo);
-        } else {
-            learnedInfo = game.user.getFlag(MODULE_ID, `learnedInfo.${actorId}.${targetId}`) || [];
-            console.log(`${MODULE_TITLE} | Personal learned info:`, learnedInfo);
-        }
-
-        if (learnedInfo.length === 0) {
-            ui.notifications.info(`${shareWithParty ? 'Your party hasn\'t' : 'You haven\'t'} learned anything about ${targetName} yet.`);
-            return;
-        }
-
-        // Build content
-        let content = `<div style="padding: 8px;">`;
-        content += `<h2 style="margin-top: 0;">Known Information: ${targetName}</h2>`;
-        if (shareWithParty) {
-            content += `<p style="font-style: italic; color: #666; margin-top: 0;">Party knowledge shared</p>`;
-        }
-        content += `<ul style="list-style: none; padding-left: 0;">`;
-
-        for (const infoId of learnedInfo) {
-            const infoValue = this.getInformationValue(targetActor, infoId);
-            const infoLabel = this.getInfoLabel(infoId);
-
-            if (shareWithParty && infoByLearner.has(infoId)) {
-                const learners = infoByLearner.get(infoId);
-                content += `<li style="margin-bottom: 8px;">
-                    <strong>${infoLabel}:</strong> ${infoValue}
-                    <span style="font-size: 0.85em; color: #666; font-style: italic;"> (learned by ${learners.join(', ')})</span>
-                </li>`;
-            } else {
-                content += `<li style="margin-bottom: 8px;"><strong>${infoLabel}:</strong> ${infoValue}</li>`;
-            }
-        }
-
-        content += `</ul></div>`;
-
-        new Dialog({
-            title: `Recall Knowledge: ${targetName}`,
-            content: content,
-            buttons: {
-                close: {
-                    label: 'Close'
-                }
-            }
-        }).render(true);
-    }
-
-    /**
-     * Get readable label for info ID
-     */
-    getInfoLabel(infoId) {
-        const labels = {
-            'highest-save': 'Highest Save',
-            'lowest-save': 'Lowest Save',
-            'resistances': 'Resistances',
-            'weaknesses': 'Weaknesses',
-            'immunities': 'Immunities',
-            'attacks': 'Attacks',
-            'skills': 'Skills',
-            'background': 'Background',
-            'special-attacks': 'Special Attacks',
-            'special-abilities': 'Special Abilities'
-        };
-        return labels[infoId] || infoId;
-    }
-
-    getKnowledgeSkills(actor) {
-        const skills = [];
-
-        // Add all core knowledge skills (expanded list for PF2e Remaster)
-        const coreSkills = ['arcana', 'crafting', 'occultism', 'nature', 'religion', 'society'];
-        for (const skillKey of coreSkills) {
-            const skill = actor.system.skills?.[skillKey];
-            if (skill) {
-                // Handle different skill data structures
-                const modifier = skill.mod ?? skill.totalModifier ?? skill.value ?? 0;
-                const label = skill.label ?? skillKey.charAt(0).toUpperCase() + skillKey.slice(1);
-
-                skills.push({
-                    key: skillKey,
-                    name: label,
-                    modifier: modifier
-                });
-            }
-        }
-
-        // Add lore skills
-        if (actor.system.skills) {
-            const loreSkills = Object.entries(actor.system.skills).filter(([key]) => key.toLowerCase().includes('lore'));
-            for (const [key, skill] of loreSkills) {
-                const modifier = skill.mod ?? skill.totalModifier ?? skill.value ?? 0;
-                const label = skill.label || 'Lore';
-
-                skills.push({
-                    key: key,
-                    name: label,
-                    modifier: modifier
-                });
-            }
-        }
-
-        // Sort skills by modifier in descending order
-        skills.sort((a, b) => b.modifier - a.modifier);
-
-        return skills;
-    }
-
-    /**
-     * Get appropriate Recall Knowledge skills for a creature based on its traits
-     * Reference: PF2e Core Rulebook, Recall Knowledge action
-     */
-    getAppropriateSkills(targetActor) {
-        if (!targetActor?.system?.traits?.value) return [];
-
-        const traits = targetActor.system.traits.value.map(t => t.toLowerCase());
-        const appropriateSkills = [];
-
-        // Universal Lore skills that work for ALL Recall Knowledge checks
-        const universalLores = ['bardic-lore', 'esoteric-lore', 'gossip-lore', 'loremaster-lore'];
-        appropriateSkills.push(...universalLores);
-
-        // Map creature traits to appropriate skills
-        // Reference: https://2e.aonprd.com/Actions.aspx?ID=26
-
-        if (traits.includes('aberration')) {
-            appropriateSkills.push('occultism');
-        }
-
-        if (traits.includes('animal')) {
-            appropriateSkills.push('nature');
-        }
-
-        if (traits.includes('astral')) {
-            appropriateSkills.push('occultism');
-        }
-
-        if (traits.includes('beast')) {
-            appropriateSkills.push('arcana', 'nature');
-        }
-
-        if (traits.includes('celestial')) {
-            appropriateSkills.push('religion');
-        }
-
-        if (traits.includes('construct')) {
-            appropriateSkills.push('arcana', 'crafting');
-        }
-
-        if (traits.includes('dragon')) {
-            appropriateSkills.push('arcana');
-        }
-
-        if (traits.includes('elemental')) {
-            appropriateSkills.push('arcana', 'nature');
-        }
-
-        if (traits.includes('ethereal')) {
-            appropriateSkills.push('occultism');
-        }
-
-        if (traits.includes('fey')) {
-            appropriateSkills.push('nature');
-        }
-
-        if (traits.includes('fiend')) {
-            appropriateSkills.push('religion');
-        }
-
-        if (traits.includes('fungus')) {
-            appropriateSkills.push('nature');
-        }
-
-        if (traits.includes('giant')) {
-            appropriateSkills.push('society'); // Added in Remaster
-        }
-
-        if (traits.includes('humanoid')) {
-            appropriateSkills.push('society');
-        }
-
-        if (traits.includes('monitor')) {
-            appropriateSkills.push('religion');
-        }
-
-        if (traits.includes('ooze')) {
-            appropriateSkills.push('occultism');
-        }
-
-        if (traits.includes('plant')) {
-            appropriateSkills.push('nature');
-        }
-
-        if (traits.includes('undead')) {
-            appropriateSkills.push('religion');
-        }
-
-        // Add Bestiary Scholar skill if configured and character has the feat
-        // Bestiary Scholar works when nature, religion, occultism, or arcana would be appropriate
-        const bestiaryScholarSkill = game.settings.get(MODULE_ID, 'bestiaryScholarSkill');
-        if (bestiaryScholarSkill && bestiaryScholarSkill !== '') {
-            // Check if any of the core knowledge skills are appropriate
-            const knowledgeSkills = ['nature', 'religion', 'occultism', 'arcana'];
-            const hasKnowledgeSkill = knowledgeSkills.some(skill => appropriateSkills.includes(skill));
-
-            if (hasKnowledgeSkill) {
-                appropriateSkills.push(bestiaryScholarSkill);
-            }
-        }
-
-        // Remove duplicates
-        return [...new Set(appropriateSkills)];
-    }
-
-    sendGMApprovalRequest(actor, target, availableSkills) {
-        const request = {
-            playerId: game.user.id,
-            playerName: game.user.name,
-            actorId: actor.id,
-            targetId: this.getUniqueTargetId(target),
-            availableSkills: availableSkills,
-            timestamp: Date.now()
-        };
-
-        // Emit to GMs
-        const socketHandler = globalThis.RecallKnowledge?.module?.socketHandler;
-        if (socketHandler) {
-            socketHandler.emit('GM_APPROVAL_REQUEST', request);
-        }
-
-        ui.notifications.info('Recall Knowledge request sent to GM for approval. The GM can adjust your attempt count if needed.');
-    }
-
-    showSkillSelectionDialog(actor, target, availableSkills) {
-        // Get appropriate skills for this creature type
-        const targetActor = target.actor || target;
-        let appropriateSkills = this.getAppropriateSkills(targetActor);
-
-        // Add Bestiary Scholar skill if character has the feat and knowledge skills are appropriate
-        const bestiaryScholarSkill = game.settings.get(MODULE_ID, 'bestiaryScholarSkill');
-        if (bestiaryScholarSkill && bestiaryScholarSkill !== '' && this.hasBestiaryScholar(actor)) {
-            const knowledgeSkills = ['nature', 'religion', 'occultism', 'arcana'];
-            const hasKnowledgeSkill = knowledgeSkills.some(skill => appropriateSkills.includes(skill));
-
-            if (hasKnowledgeSkill && !appropriateSkills.includes(bestiaryScholarSkill)) {
-                appropriateSkills.push(bestiaryScholarSkill);
-            }
-        }
-
-        const skillOptions = availableSkills.map((skill, index) => {
-            const modifierText = skill.modifier >= 0 ? `+${skill.modifier}` : skill.modifier;
-
-            // Determine color coding
-            let backgroundColor = 'transparent';
-            let borderColor = '#999';
-
-            if (appropriateSkills.includes(skill.key)) {
-                // Appropriate skill (including universal lores) - Green
-                backgroundColor = '#d4edda';
-                borderColor = '#28a745';
-            } else if (skill.key.toLowerCase().includes('lore')) {
-                // Other Lore skill - Purple
-                backgroundColor = '#e8d4f0';
-                borderColor = '#6f42c1';
-            }
-
-            return `
-                <div style="margin: 8px 0;">
-                    <label style="display: flex; align-items: center; cursor: pointer; padding: 8px; border: 2px solid ${borderColor}; border-radius: 4px; background: ${backgroundColor};">
-                        <input type="radio" name="selectedSkill" value="${skill.key}" ${index === 0 ? 'checked' : ''} style="margin-right: 8px;">
-                        <span><strong>${skill.name}</strong> (${modifierText})</span>
-                    </label>
-                </div>
-            `;
-        }).join('');
-
-        // Check if any selected skill has Assurance
-        const hasAnyAssurance = availableSkills.some(skill => {
-            const actorSkill = actor.system.skills?.[skill.key];
-            return actorSkill?.modifiers?.some(m => m.slug === 'assurance' || m.type === 'ability');
-        });
-
-        const content = `
-            <div class="recall-knowledge-dialog">
-                <p>Select a knowledge skill to use against <strong>${target.name}</strong>:</p>
-                <p style="font-size: 0.9em; color: #666; margin-bottom: 12px;">
-                    <span style="color: #28a745;">■</span> Appropriate for creature type &nbsp;
-                    <span style="color: #6f42c1;">■</span> Lore (may be appropriate)
-                </p>
-                <div style="margin: 12px 0;">
-                    ${skillOptions}
-                </div>
-                ${hasAnyAssurance ? `
-                <div style="margin-top: 16px; padding: 8px; border: 1px solid #ffc107; border-radius: 4px; background: #fff3cd;">
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input type="checkbox" id="useAssurance" style="margin-right: 8px;">
-                        <span><strong>Use Assurance</strong> (10 + proficiency only, if available for selected skill)</span>
-                    </label>
-                </div>
-                ` : ''}
-            </div>
-        `;
-
-        new Dialog({
-            title: 'Recall Knowledge',
-            content: content,
-            buttons: {
-                roll: {
-                    label: 'Roll',
-                    callback: (html) => {
-                        const selectedSkill = html.find('[name="selectedSkill"]:checked').val();
-                        const useAssurance = html.find('#useAssurance').is(':checked');
-                        this.performRecallKnowledgeRoll(actor, target, selectedSkill, useAssurance);
-                    }
-                },
-                cancel: {
-                    label: 'Cancel'
-                }
-            },
-            default: 'roll'
-        }).render(true);
-    }
-
-    async performRecallKnowledgeRoll(actor, target, skillKey, useAssurance = false) {
-        const skill = actor.system.skills?.[skillKey];
-        if (!skill) {
-            ui.notifications.error('Selected skill not found.');
-            return;
-        }
-
-        // Get modifier with fallbacks
-        let modifier = skill.mod ?? skill.totalModifier ?? skill.value ?? 0;
-        const skillLabel = skill.label ?? skillKey.charAt(0).toUpperCase() + skillKey.slice(1);
-
-        // Get target IDs for tracking - use unique token ID for each instance
-        const targetActor = target.actor || target;
-        const targetId = this.getUniqueTargetId(target);
-        const actorId = actor.id;
-
-        // Check for Assurance feat on this skill
-        let hasAssurance = false;
-        let assuranceValue = 10;
-
-        if (useAssurance) {
-            // Check if actor has Assurance feat for this skill
-            const assuranceFeat = actor.items.find(item =>
-                item.type === 'feat' &&
-                (item.slug === `assurance-${skillKey}` ||
-                    item.name?.toLowerCase() === `assurance (${skillLabel.toLowerCase()})` ||
-                    item.system?.rules?.some(rule =>
-                        rule.key === 'RollOption' &&
-                        rule.option === `assurance:${skillKey}`
-                    ))
-            );
-
-            if (assuranceFeat) {
-                hasAssurance = true;
-                // Assurance uses 10 + proficiency bonus (rank * 2 + level)
-                const rank = skill.rank ?? 0;
-                const level = actor.system.details?.level?.value ?? 0;
-                assuranceValue = 10 + (rank * 2) + level;
-            } else {
-                ui.notifications.warn(`You don't have Assurance for ${skillLabel}.`);
-                useAssurance = false;
-            }
-        }
-
-        // Check for Thorough Reports bonus (does NOT apply with Assurance)
-        const thoroughReportsBonus = this.checkThoroughReportsBonus(actor, targetActor, skillKey);
-
-        // Calculate DC with adjustments for previous attempts
-        const autoCalculateDC = game.settings.get(MODULE_ID, 'autoCalculateDC');
-        let dc = 15; // Default DC
-
-        if (autoCalculateDC && target.actor) {
-            const level = target.actor.system.details?.level?.value || 0;
-            dc = 10 + level; // Simple DC calculation
-        }
-
-        // Increase DC by 2 for each previous Recall Knowledge attempt (PF2e standard)
-        // DC = base + (2 × number of previous attempts)
-        const previousAttempts = this.getRecallAttempts(actorId, targetId);
-        const currentAttemptNumber = previousAttempts + 1;
-        const baseDC = dc;
-        dc += (previousAttempts * 2);
-
-        console.log(`${MODULE_TITLE} | DC Calculation for ${target.name}:`);
-        console.log(`${MODULE_TITLE} | - Base DC: ${baseDC}`);
-        console.log(`${MODULE_TITLE} | - Previous attempts: ${previousAttempts}`);
-        console.log(`${MODULE_TITLE} | - This is attempt #${currentAttemptNumber}`);
-        console.log(`${MODULE_TITLE} | - DC adjustment: +${previousAttempts * 2} (${previousAttempts} attempts × 2)`);
-        console.log(`${MODULE_TITLE} | - Final DC: ${dc}`);
-
-        // Perform the roll or use Assurance
-        let roll;
-        let rollTotal;
-        let degree = 'failure';
-
-        if (useAssurance && hasAssurance) {
-            // Create a fake roll for Assurance (no randomness, no bonuses)
-            rollTotal = assuranceValue;
-            roll = await new Roll(`${rollTotal}`).evaluate();
-            roll._formula = `Assurance: 10 + proficiency`;
-
-            // Determine success level
-            if (rollTotal >= dc + 10) {
-                degree = 'criticalSuccess';
-            } else if (rollTotal >= dc) {
-                degree = 'success';
-            } else if (rollTotal <= dc - 10) {
-                degree = 'criticalFailure';
-            }
-
-            // Process the result after Assurance
-            this.processRecallKnowledgeResult(actor, target, skillKey, roll, rollTotal, degree, dc, useAssurance, hasAssurance, assuranceValue, thoroughReportsBonus, actorId, targetId, targetActor);
-        } else {
-            // Use PF2e's native skill check dialog via the Statistic object
-            console.log(`${MODULE_TITLE} | Attempting to use PF2e roll dialog for skill: ${skillKey}`);
-
-            // Get the skill statistic from actor.skills
-            const skillStatistic = actor.skills?.[skillKey];
-
-            if (skillStatistic && typeof skillStatistic.roll === 'function') {
-                console.log(`${MODULE_TITLE} | Using skill statistic.roll() method`);
-
-                // Build roll options
-                const rollConfig = {
-                    dc: { value: dc },
-                    skipDialog: false,
-                    createMessage: false, // We'll create our own message
-                    rollMode: game.settings.get('core', 'rollMode')
-                };
-
-                // Add Thorough Reports as a modifier if applicable
-                if (thoroughReportsBonus > 0) {
-                    rollConfig.modifiers = [{
-                        label: 'Thorough Reports',
-                        modifier: thoroughReportsBonus,
-                        type: 'circumstance'
-                    }];
-                }
-
-                try {
-                    const checkRoll = await skillStatistic.roll(rollConfig);
-
-                    if (!checkRoll) {
-                        console.log(`${MODULE_TITLE} | Roll was cancelled`);
-                        return;
-                    }
-
-                    roll = checkRoll;
-                    rollTotal = roll.total;
-
-                    console.log(`${MODULE_TITLE} | Roll result:`, roll);
-                    console.log(`${MODULE_TITLE} | Roll total:`, rollTotal);
-                    console.log(`${MODULE_TITLE} | Degree of success:`, roll.degreeOfSuccess);
-
-                    // Determine degree from PF2e roll
-                    const degreeValue = roll.degreeOfSuccess;
-                    if (degreeValue !== undefined) {
-                        degree = degreeValue === 3 ? 'criticalSuccess' :
-                            degreeValue === 2 ? 'success' :
-                                degreeValue === 1 ? 'failure' : 'criticalFailure';
-                    } else {
-                        // Fallback to manual calculation
-                        if (rollTotal >= dc + 10) {
-                            degree = 'criticalSuccess';
-                        } else if (rollTotal >= dc) {
-                            degree = 'success';
-                        } else if (rollTotal <= dc - 10) {
-                            degree = 'criticalFailure';
-                        }
-                    }
-
-                    console.log(`${MODULE_TITLE} | Degree of success:`, degree);
-
-                    // Process the result
-                    this.processRecallKnowledgeResult(actor, target, skillKey, roll, rollTotal, degree, dc, useAssurance, hasAssurance, assuranceValue, thoroughReportsBonus, actorId, targetId, targetActor);
-                } catch (error) {
-                    console.error(`${MODULE_TITLE} | Error rolling skill:`, error);
-                    // Fallback to basic roll
-                    const modifier = skill.mod ?? skill.totalModifier ?? skill.value ?? 0;
-                    await this.performBasicRoll(actor, target, skillKey, modifier, dc, thoroughReportsBonus, actorId, targetId, targetActor);
-                }
-            } else {
-                console.log(`${MODULE_TITLE} | Falling back to basic roll - skill statistic not found`);
-                // Fallback to basic roll if PF2e skill statistic not available
-                const modifier = skill.mod ?? skill.totalModifier ?? skill.value ?? 0;
-                await this.performBasicRoll(actor, target, skillKey, modifier, dc, thoroughReportsBonus, actorId, targetId, targetActor);
-            }
-        }
-    }
-
-    async performBasicRoll(actor, target, skillKey, modifier, dc, thoroughReportsBonus, actorId, targetId, targetActor) {
-        const skill = actor.system.skills?.[skillKey];
-        const skillLabel = skill.label ?? skillKey.charAt(0).toUpperCase() + skillKey.slice(1);
-
-        // Apply Thorough Reports bonus
-        if (thoroughReportsBonus > 0) {
-            modifier += thoroughReportsBonus;
-        }
-
-        const roll = await new Roll(`1d20 + ${modifier}`).evaluate();
-        const rollTotal = roll.total;
-
-        // Determine success level
-        let degree = 'failure';
-        if (rollTotal >= dc + 10) {
-            degree = 'criticalSuccess';
-        } else if (rollTotal >= dc) {
-            degree = 'success';
-        } else if (rollTotal <= dc - 10) {
-            degree = 'criticalFailure';
-        }
-
-        this.processRecallKnowledgeResult(actor, target, skillKey, roll, rollTotal, degree, dc, false, false, 0, thoroughReportsBonus, actorId, targetId, targetActor);
-    }
-
-    async processRecallKnowledgeResult(actor, target, skillKey, roll, rollTotal, degree, dc, useAssurance, hasAssurance, assuranceValue, thoroughReportsBonus, actorId, targetId, targetActor) {
-        const skill = actor.system.skills?.[skillKey];
-        const skillLabel = skill.label ?? skillKey.charAt(0).toUpperCase() + skillKey.slice(1);
-
-        // Increment attempts now that the roll has been completed
-        await this.incrementRecallAttempts(actorId, targetId);
-
-        // Track creature type for Thorough Reports (only on success or critical success)
-        if ((degree === 'success' || degree === 'criticalSuccess') && this.hasThoroughReportsFeat(actor)) {
-            this.trackCreatureType(actorId, targetActor);
-        }
-
-        // Check settings
-        const hideRollFromPlayer = game.settings.get(MODULE_ID, 'hideRollFromPlayer');
-        const falseInfoOnCritFail = game.settings.get(MODULE_ID, 'falseInfoOnCritFail');
-        const shareWithParty = game.settings.get(MODULE_ID, 'shareWithParty');
-
-        // Calculate number of pieces of information learned
-        const infoBreakdown = this.calculateInformationCount(actor, degree, true);
-        let infoCount = infoBreakdown.total;
-        let isFalseInfo = false;
-
-        // Handle critical failure with false information setting
-        if (degree === 'criticalFailure' && falseInfoOnCritFail) {
-            infoCount = 1; // Show as if they got 1 piece of information
-            isFalseInfo = true;
-        }
-
-        // Render the roll tooltip
-        const rollHtml = await roll.render();
-
-        // Build information pieces tooltip
-        let infoTooltip = '';
-        if (infoBreakdown.sources.length > 0) {
-            infoTooltip = infoBreakdown.sources.join('\n');
-        }
-
-        // Build chat message content
-        let chatContent = `
-            <div class="recall-knowledge-result ${degree.replace(/([A-Z])/g, '-$1').toLowerCase()}">
-                <div class="rk-header">
-                    <strong>Recall Knowledge: ${skillLabel}</strong>
-                    ${useAssurance && hasAssurance ? '<span class="rk-badge">Assurance</span>' : ''}
-                </div>
-                <div class="rk-target">Target: <strong>${target.name}</strong></div>
-                <div class="rk-dc-line">
-                    <span class="rk-dc">DC: <strong>${dc}</strong></span>
-                    <span class="rk-degree ${degree.toLowerCase()}">${degree}</span>
-                </div>
-                ${rollHtml}`;
-
-        if (useAssurance && hasAssurance) {
-            chatContent += `<div class="rk-detail">Assurance: 10 + proficiency = ${assuranceValue}</div>`;
-        }
-
-        if (thoroughReportsBonus > 0 && !useAssurance) {
-            chatContent += `<div class="rk-detail">Thorough Reports: +${thoroughReportsBonus}</div>`;
-        }
-
-        chatContent += `<div class="rk-info">
-                    <span class="rk-info-label">Information Pieces:</span> 
-                    <span class="rk-info-count" title="${infoTooltip}">${infoCount}</span>
-                </div>
-                <div class="rk-learned" data-actor-id="${actorId}" data-target-id="${targetId}" data-is-false="${isFalseInfo}">
-                    <div class="rk-learned-label">What was learned:</div>
-                    <div class="rk-learned-content">
-                        <em>Selecting information...</em>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Create chat message
-        const chatData = {
-            user: game.user.id,
-            speaker: ChatMessage.getSpeaker({ actor }),
-            content: chatContent,
-            roll: roll,
-            type: CONST.CHAT_MESSAGE_TYPES.ROLL,
-            sound: CONFIG.sounds.dice,
-            whisper: game.user.isGM ? [] : game.users.filter(u => u.isGM).map(u => u.id),
-            flags: {
-                [MODULE_ID]: {
-                    actorId: actorId,
-                    targetId: targetId,
-                    isFalseInfo: isFalseInfo,
-                    shareWithParty: shareWithParty
-                }
-            }
-        };
-
-        // Determine who should see the roll result
-        if (hideRollFromPlayer) {
-            // Only GM sees the roll
-            chatData.whisper = game.users.filter(u => u.isGM).map(u => u.id);
-        } else if (!game.user.isGM) {
-            // Player sees their own roll and GMs see it
-            chatData.whisper = [game.user.id, ...game.users.filter(u => u.isGM).map(u => u.id)];
-        }
-
-        const chatMessage = await ChatMessage.create(chatData);
-
-        // Show information selection dialog or failure message
-        if (infoCount > 0) {
-            this.showInformationSelectionDialog(actor, target, infoCount, isFalseInfo, skillKey, chatMessage);
-        } else {
-            // Failure - notify player
-            ui.notifications.info(`You failed to recall any information about ${target.name}.`);
-
-            const failureChat = {
-                user: game.user.id,
-                speaker: ChatMessage.getSpeaker({ actor }),
-                content: `<p><em>Failed to recall any information about ${target.name}.</em></p>`,
-                whisper: [game.user.id]
-            };
-            ChatMessage.create(failureChat);
-        }
-    }
-
-    /**
-     * Calculate how many pieces of information the character learns
-     * Based on success level and character feats/abilities
-     */
-    calculateInformationCount(actor, degree, returnBreakdown = false) {
-        // Base information count
-        let count = 0;
-        const sources = [];
-
-        if (degree === 'criticalSuccess') {
-            count = 2;
-            sources.push('Critical Success: 2 pieces');
-        } else if (degree === 'success') {
-            count = 1;
-            sources.push('Success: 1 piece');
-        } else {
-            return returnBreakdown ? { total: 0, sources: [] } : 0; // No information on failure or critical failure
-        }
-
-        // Check for feats that grant additional information
-        const bonusResult = this.checkRecallKnowledgeBonuses(actor, true);
-
-        if (bonusResult.bonus > 0) {
-            count += bonusResult.bonus;
-            sources.push(...bonusResult.sources);
-            console.log(`${MODULE_TITLE} | Actor has +${bonusResult.bonus} bonus information from feats/abilities`);
-        }
-
-        return returnBreakdown ? { total: count, sources: sources } : count;
-    }
-
-    /**
-     * Check actor for feats and effects that grant additional Recall Knowledge information
-     */
-    checkRecallKnowledgeBonuses(actor, returnSources = false) {
-        let bonus = 0;
-        const sources = [];
-
-        // List of feat names/slugs that grant additional information
-        const bonusFeats = [
-            'know-it-all',          // Bard/Thaumaturge feat - grants additional info
-            'know it all',          // Eldritch Researcher archetype version
-            'thorough research',    // Investigator feat - grants additional info
-            'font of knowledge',    // Scrollmaster archetype - grants additional info
-            'fountain of secrets'   // Shisk ancestry feat - grants additional info
-        ];
-
-        // Check actor's items (feats are stored as items in PF2e)
-        if (actor.items) {
-            for (const item of actor.items) {
-                const itemName = item.name?.toLowerCase() || '';
-                const itemSlug = item.system?.slug?.toLowerCase() || '';
-
-                // Check if this is a feat that grants bonus information
-                if (item.type === 'feat' || item.type === 'feature') {
-                    for (const featName of bonusFeats) {
-                        if (itemName.includes(featName) || itemSlug.includes(featName)) {
-                            bonus++;
-                            sources.push(`${item.name}: +1 piece`);
-                            console.log(`${MODULE_TITLE} | Found bonus feat: ${item.name}`);
-                            break; // Only count each item once
-                        }
-                    }
-                }
-            }
-        }
-
-        // Check for active effects that might grant bonuses
-        if (actor.effects) {
-            for (const effect of actor.effects) {
-                const effectName = effect.name?.toLowerCase() || '';
-                const effectLabel = effect.label?.toLowerCase() || '';
-
-                // Check for Pocket Library spell or similar effects
-                if (effectName.includes('pocket library') || effectLabel.includes('pocket library')) {
-                    bonus++;
-                    sources.push(`${effect.name || effect.label}: +1 piece`);
-                    console.log(`${MODULE_TITLE} | Found bonus effect: ${effect.name || effect.label}`);
-                }
-            }
-        }
-
-        return returnSources ? { bonus: bonus, sources: sources } : bonus;
-    }
-
-    /**
-     * Show interactive dialog for selecting information to learn
-     */
-    showInformationSelectionDialog(actor, target, maxCount, isFalseInfo = false, skillKey = null, chatMessage = null) {
-        let remainingCount = maxCount;
-        const selectedInfo = [];
-
-        // Get previously learned information - use unique token ID for each instance
-        const targetActor = target.actor || target;
-        const targetId = this.getUniqueTargetId(target);
-        const actorId = actor.id;
-        const learnedInfo = this.getLearnedInformation(actorId, targetId);
-
-        const infoOptions = [
-            { id: 'highest-save', label: 'Highest Save' },
-            { id: 'lowest-save', label: 'Lowest Save' },
-            { id: 'resistances', label: 'Resistances' },
-            { id: 'weaknesses', label: 'Weaknesses' },
-            { id: 'immunities', label: 'Immunities' },
-            { id: 'attacks', label: 'Attacks' },
-            { id: 'skills', label: 'Skills' },
-            { id: 'background', label: 'Creature Background' }
-        ];
-
-        const generateContent = () => {
-            let html = `
-                <div class="recall-knowledge-info-selection">
-                    <p style="font-size: 16px; font-weight: bold; margin-bottom: 12px;">
-                        Information Pieces Remaining: <span id="remaining-count">${remainingCount}</span>
-                    </p>
-            `;
-
-            // Show previously learned information if any
-            if (learnedInfo.length > 0) {
-                const targetActor = target.actor || target;
-                html += `
-                    <div style="margin-bottom: 16px; padding: 12px; background: #f0f0f0; border-radius: 4px;">
-                        <p style="font-weight: bold; margin-bottom: 8px;">Already Learned:</p>
-                        <ul style="margin: 0; padding-left: 20px; list-style: none;">
-                            ${learnedInfo.map(id => {
-                    const option = infoOptions.find(o => o.id === id);
-                    const infoValue = this.getInformationValue(targetActor, id);
-                    return `<li style="margin-bottom: 4px;"><strong>${option ? option.label : id}:</strong> ${infoValue}</li>`;
-                }).join('')}
-                        </ul>
-                    </div>
-                `;
-            }
-
-            html += `<p style="margin-bottom: 16px;">Select the information you want to learn about <strong>${target.name}</strong>:</p>
-                    <div style="display: flex; flex-direction: column; gap: 8px;">
-            `;
-
-            for (const option of infoOptions) {
-                const isAlreadyLearned = learnedInfo.includes(option.id);
-                const isSelected = selectedInfo.includes(option.id);
-                const isDisabled = isAlreadyLearned || (!isSelected && remainingCount === 0);
-
-                html += `
-                    <label style="display: flex; align-items: center; padding: 8px; border: 1px solid #999; border-radius: 4px; cursor: ${isDisabled ? 'not-allowed' : 'pointer'}; background: ${isAlreadyLearned ? '#d0d0d0' : isSelected ? '#e8f4f8' : 'transparent'}; opacity: ${isDisabled ? '0.5' : '1'};">
-                        <input 
-                            type="checkbox" 
-                            name="info-option" 
-                            value="${option.id}" 
-                            ${isSelected ? 'checked' : ''} 
-                            ${isDisabled ? 'disabled' : ''}
-                            style="margin-right: 8px;"
-                            data-option="${option.id}"
-                        >
-                        <span style="font-weight: 500;">${option.label}${isAlreadyLearned ? ' (Already Known)' : ''}</span>
-                    </label>
-                `;
-            }
-
-            html += `
-                    </div>
-                </div>
-            `;
-
-            return html;
-        };
-
-        const dialog = new Dialog({
-            title: 'Select Information to Learn',
-            content: generateContent(),
-            buttons: {
-                confirm: {
-                    label: 'Confirm',
-                    callback: async (html) => {
-                        const checkedBoxes = html.find('input[name="info-option"]:checked');
-                        const finalSelection = [];
-                        checkedBoxes.each(function () {
-                            finalSelection.push($(this).val());
-                        });
-
-                        // Store learned information (even if false, so they can't try again to get real info)
-                        if (!isFalseInfo) {
-                            await this.storeLearnedInformation(actorId, targetId, finalSelection);
-                        }
-
-                        this.revealSelectedInformation(actor, target, finalSelection, isFalseInfo, chatMessage);
-
-                        // Check for Diverse Recognition
-                        if (skillKey && this.hasDiverseRecognition(actor) && !this.hasDiverseRecognitionBeenUsed(actorId)) {
-                            // Check if actor is master in this skill
-                            const skill = actor.system.skills?.[skillKey];
-                            const isMaster = skill?.rank >= 3; // 3 = Master, 4 = Legendary
-
-                            if (isMaster) {
-                                this.offerDiverseRecognition(actor, target, skillKey);
-                            }
-                        }
-                    }
-                },
-                cancel: {
-                    label: 'Cancel'
-                }
-            },
-            default: 'confirm',
-            render: (html) => {
-                // Add change listeners to checkboxes
-                html.find('input[name="info-option"]').on('change', (event) => {
-                    const checkbox = $(event.currentTarget);
-                    const optionId = checkbox.data('option');
-
-                    if (checkbox.is(':checked')) {
-                        if (remainingCount > 0) {
-                            selectedInfo.push(optionId);
-                            remainingCount--;
-                        } else {
-                            checkbox.prop('checked', false);
-                            return;
-                        }
-                    } else {
-                        const index = selectedInfo.indexOf(optionId);
-                        if (index > -1) {
-                            selectedInfo.splice(index, 1);
-                            remainingCount++;
-                        }
-                    }
-
-                    // Update remaining count display
-                    html.find('#remaining-count').text(remainingCount);
-
-                    // Update disabled state of unchecked boxes
-                    html.find('input[name="info-option"]').each(function () {
-                        const box = $(this);
-                        const boxOptionId = box.data('option');
-                        const isAlreadyLearned = learnedInfo.includes(boxOptionId);
-
-                        if (!box.is(':checked')) {
-                            // Keep already learned items disabled
-                            const shouldDisable = isAlreadyLearned || remainingCount === 0;
-                            box.prop('disabled', shouldDisable);
-                            box.closest('label').css({
-                                'cursor': shouldDisable ? 'not-allowed' : 'pointer',
-                                'opacity': shouldDisable ? '0.5' : '1',
-                                'background': isAlreadyLearned ? '#d0d0d0' : 'transparent'
-                            });
-                        }
-                    });
-                });
-            }
-        });
-
-        dialog.render(true);
-    }
-
-    /**
-     * Get learned information for actor-target pair
-     */
-    getLearnedInformation(actorId, targetId) {
-        const shareWithParty = game.settings.get(MODULE_ID, 'shareWithParty');
-
-        if (shareWithParty) {
-            // Gather information from all party members in "The Party" actor
-            const allLearnedInfo = new Set();
-
-            // Find "The Party" actor (PF2e party system)
-            const partyActor = game.actors.find(a => a.type === "party" || a.name === "The Party");
-            const partyActors = partyActor?.system?.details?.members ? Array.from(partyActor.system.details.members).map(m => game.actors.get(m.uuid.split('.').pop())) : [];
-
-            for (const partyActor of partyActors) {
-                // Check all users for this actor's learned information
-                for (const user of game.users) {
-                    const userInfo = user.getFlag(MODULE_ID, `learnedInfo.${partyActor.id}.${targetId}`) || [];
-                    userInfo.forEach(info => allLearnedInfo.add(info));
-                }
-            }
-
-            return Array.from(allLearnedInfo);
-        } else {
-            // Only return current user's learned information
-            return game.user.getFlag(MODULE_ID, `learnedInfo.${actorId}.${targetId}`) || [];
-        }
-    }    /**
-     * Store learned information for actor-target pair
-     */
-    async storeLearnedInformation(actorId, targetId, newInfo) {
-        // Get only THIS user's existing info (not party-wide)
-        const existing = game.user.getFlag(MODULE_ID, `learnedInfo.${actorId}.${targetId}`) || [];
-        const combined = [...new Set([...existing, ...newInfo])]; // Merge and deduplicate
-        await game.user.setFlag(MODULE_ID, `learnedInfo.${actorId}.${targetId}`, combined);
-        console.log(`${MODULE_TITLE} | Stored learned info for actor ${actorId}, target ${targetId}:`, combined);
-        console.log(`${MODULE_TITLE} | Full learnedInfo structure:`, game.user.getFlag(MODULE_ID, 'learnedInfo'));
-    }
-
-    /**
-     * Get the actual information value for display
-     */
-    getInformationValue(targetActor, infoId) {
-        if (!targetActor || !targetActor.system) return 'Unknown';
-
-        switch (infoId) {
-            case 'highest-save':
-                return this.getHighestSave(targetActor);
-            case 'lowest-save':
-                return this.getLowestSave(targetActor);
-            case 'resistances':
-                return this.getResistances(targetActor) || 'None';
-            case 'weaknesses':
-                return this.getWeaknesses(targetActor) || 'None';
-            case 'immunities':
-                return this.getImmunities(targetActor) || 'None';
-            case 'attacks':
-                return this.getAttacks(targetActor);
-            case 'skills':
-                return this.getSkills(targetActor);
-            case 'background':
-                const bg = this.getCreatureBackground(targetActor);
-                return bg.length > 100 ? bg.substring(0, 100) + '...' : bg;
-            case 'special-attacks':
-                return this.getSpecialAttacks(targetActor) || 'None known';
-            case 'special-abilities':
-                return this.getSpecialAbilities(targetActor) || 'None known';
-            default:
-                return 'Unknown';
-        }
-    }
-
-    /**
-     * Get unique identifier for a target token/actor for attempt tracking
-     * This ensures that different instances of the same creature type are tracked separately
-     */
-    getUniqueTargetId(target) {
-        // Debug the target object
-        console.log(`${MODULE_TITLE} | getUniqueTargetId DEBUG:`, {
-            'target.name': target.name,
-            'target.id': target.id,
-            'target.uuid': target.uuid,
-            'target.constructor.name': target.constructor.name,
-            'target._id': target._id,
-            'target.actor?.id': target.actor?.id,
-            'target.actor?.name': target.actor?.name,
-            'isToken': target.constructor.name === 'Token' || target.constructor.name === 'TokenDocument',
-            'isActor': target.constructor.name === 'Actor' || target.constructor.name === 'ActorPF2e'
-        });
-
-        let uniqueId;
-        
-        // For actors that come from tokens, extract the token ID from UUID
-        if (target.uuid && target.uuid.includes('.Token.')) {
-            const tokenMatch = target.uuid.match(/\.Token\.([^.]+)/);
-            if (tokenMatch) {
-                uniqueId = tokenMatch[1]; // Extract token ID
-                console.log(`${MODULE_TITLE} | Using token ID from UUID:`, uniqueId);
-            }
-        }
-        
-        // Fallback: if target has an ID (direct token reference), use that
-        if (!uniqueId && target.id) {
-            // Check if this looks like a token vs actor by checking if target is Token-like
-            if (target.constructor.name.includes('Token')) {
-                uniqueId = target.id;
-                console.log(`${MODULE_TITLE} | Using token target.id:`, uniqueId);
-            } else {
-                // This is an actor, but we want token ID if possible
-                // Try to find a token representing this actor
-                const token = canvas.tokens.placeables.find(t => t.actor?.id === target.id);
-                if (token) {
-                    uniqueId = token.id;
-                    console.log(`${MODULE_TITLE} | Found token for actor, using token.id:`, uniqueId);
-                } else {
-                    uniqueId = target.id; // Fallback to actor ID
-                    console.log(`${MODULE_TITLE} | No token found, using actor target.id:`, uniqueId);
-                }
-            }
-        }
-        
-        // Final fallback to target UUID or _id
-        if (!uniqueId) {
-            uniqueId = target.uuid || target._id;
-            console.log(`${MODULE_TITLE} | Using fallback UUID or _id:`, uniqueId);
-        }
-
-        console.log(`${MODULE_TITLE} | getUniqueTargetId for target:`, target.name, '→', uniqueId);
-        return uniqueId;
-    }
-
-    /**
-     * Get number of previous recall knowledge attempts for DC adjustment
-     */
-    getRecallAttempts(actorId, targetId) {
-        const attempts = game.user.getFlag(MODULE_ID, `recallAttempts.${actorId}.${targetId}`) || 0;
-        console.log(`${MODULE_TITLE} | getRecallAttempts(${actorId}, ${targetId}) =`, attempts);
-        return attempts;
-    }
-
-    /**
-     * Set recall knowledge attempts to a specific value (for GM adjustment)
-     */
-    async setRecallAttempts(actorId, targetId, count) {
-        const finalCount = Math.max(0, count);
-        console.log(`${MODULE_TITLE} | setRecallAttempts(${actorId}, ${targetId}, ${count}) → ${finalCount}`);
-        await game.user.setFlag(MODULE_ID, `recallAttempts.${actorId}.${targetId}`, finalCount);
-    }
-
-    /**
-     * Increment recall knowledge attempts
-     */
-    async incrementRecallAttempts(actorId, targetId) {
-        const attempts = this.getRecallAttempts(actorId, targetId);
-        const newCount = attempts + 1;
-        console.log(`${MODULE_TITLE} | incrementRecallAttempts(${actorId}, ${targetId}) ${attempts} → ${newCount}`);
-        await game.user.setFlag(MODULE_ID, `recallAttempts.${actorId}.${targetId}`, newCount);
-    }
-
-    /**
-     * Check if actor has Thorough Reports feat
-     */
-    hasThoroughReportsFeat(actor) {
-        if (!actor.items) return false;
-        return actor.items.some(item =>
-            item.type === 'feat' &&
-            (item.name.toLowerCase().includes('thorough reports') ||
-                item.slug === 'thorough-reports')
-        );
-    }
-
-    /**
-     * Check if actor has Scrollmaster Dedication feat
-     */
-    hasScrollmasterDedication(actor) {
-        if (!actor.items) return false;
-        return actor.items.some(item =>
-            item.type === 'feat' &&
-            (item.name.toLowerCase().includes('scrollmaster dedication') ||
-                item.slug === 'scrollmaster-dedication')
-        );
-    }
-
-    /**
-     * Check if actor has Diverse Recognition feat
-     */
-    hasDiverseRecognition(actor) {
-        if (!actor.items) return false;
-        return actor.items.some(item =>
-            item.type === 'feat' &&
-            (item.name.toLowerCase().includes('diverse recognition') ||
-                item.slug === 'diverse-recognition')
-        );
-    }
-
-    /**
-     * Check if Diverse Recognition was already used this round
-     */
-    hasDiverseRecognitionBeenUsed(actorId) {
-        return game.user.getFlag(MODULE_ID, `diverseRecognition.${actorId}.used`) || false;
-    }
-
-    /**
-     * Check if actor has Bestiary Scholar feat
-     */
-    hasBestiaryScholar(actor) {
-        if (!actor.items) return false;
-        return actor.items.some(item =>
-            item.type === 'feat' &&
-            (item.name.toLowerCase().includes('bestiary scholar') ||
-                item.slug === 'bestiary-scholar')
-        );
-    }
-
-    /**
-     * Mark Diverse Recognition as used this round
-     */
-    async markDiverseRecognitionUsed(actorId) {
-        await game.user.setFlag(MODULE_ID, `diverseRecognition.${actorId}.used`, true);
-    }
-
-    /**
-     * Reset Diverse Recognition usage (called at start of new round)
-     */
-    async resetDiverseRecognitionUsage(actorId) {
-        await game.user.setFlag(MODULE_ID, `diverseRecognition.${actorId}.used`, false);
-    }
-
-    /**
-     * Offer to use Diverse Recognition feat
-     */
-    offerDiverseRecognition(actor, previousTarget, skillKey) {
-        const actorId = actor.id;
-
-        // Get all targetable tokens except the one just used
-        const previousTargetId = (previousTarget.actor || previousTarget).id;
-        const availableTargets = canvas.tokens.placeables.filter(token => {
-            const tokenActorId = token.actor?.id;
-            return tokenActorId && tokenActorId !== previousTargetId && token.actor;
-        });
-
-        if (availableTargets.length === 0) {
-            ui.notifications.warn("No other creatures available for Diverse Recognition.");
-            return;
-        }
-
-        const targetOptions = availableTargets.map(token => {
-            return `
-                <option value="${token.id}">${token.name}</option>
-            `;
-        }).join('');
-
-        const skill = actor.system.skills?.[skillKey];
-        const skillLabel = skill?.label ?? skillKey.charAt(0).toUpperCase() + skillKey.slice(1);
-
-        const content = `
-            <div class="recall-knowledge-dialog">
-                <p><strong>Diverse Recognition</strong></p>
-                <p>You successfully recalled knowledge about ${previousTarget.name}.</p>
-                <p>Would you like to attempt Recall Knowledge on a different creature using ${skillLabel}?</p>
-                <p style="margin-top: 12px;">
-                    <label for="diverse-target"><strong>Select Target:</strong></label>
-                    <select id="diverse-target" style="width: 100%; margin-top: 4px;">
-                        ${targetOptions}
-                    </select>
-                </p>
-                <p style="font-size: 0.85em; color: #666; margin-top: 8px;">
-                    <em>Frequency: Once per round</em>
-                </p>
-            </div>
-        `;
-
-        new Dialog({
-            title: 'Diverse Recognition',
-            content: content,
-            buttons: {
-                yes: {
-                    label: 'Use Diverse Recognition',
-                    callback: async (html) => {
-                        const selectedTokenId = html.find('#diverse-target').val();
-                        const selectedToken = canvas.tokens.get(selectedTokenId);
-
-                        if (selectedToken) {
-                            // Mark as used
-                            await this.markDiverseRecognitionUsed(actorId);
-
-                            // Start recall knowledge on the new target with the same skill
-                            this.performRecallKnowledgeRoll(actor, selectedToken, skillKey);
-                        }
-                    }
-                },
-                no: {
-                    label: 'No Thanks'
-                }
-            },
-            default: 'yes'
-        }).render(true);
-    }
-
-    /**
-     * Get creature trait/type for Thorough Reports tracking
-     */
-    getCreatureType(targetActor) {
-        if (!targetActor?.system?.traits?.value) return null;
-
-        // PF2e creature types (traits)
-        const creatureTypes = [
-            'aberration', 'animal', 'astral', 'beast', 'celestial', 'construct',
-            'dragon', 'elemental', 'ethereal', 'fey', 'fiend', 'fungus',
-            'giant', 'humanoid', 'monitor', 'ooze', 'plant', 'undead'
-        ];
-
-        const traits = targetActor.system.traits.value || [];
-
-        // Find the first matching creature type trait
-        for (const trait of traits) {
-            const traitLower = trait.toLowerCase();
-            if (creatureTypes.includes(traitLower)) {
-                return traitLower;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Track creature type for Thorough Reports
-     */
-    trackCreatureType(actorId, targetActor) {
-        const creatureType = this.getCreatureType(targetActor);
-        if (!creatureType) return;
-
-        const trackedTypes = game.user.getFlag(MODULE_ID, `thoroughReports.${actorId}`) || [];
-        if (!trackedTypes.includes(creatureType)) {
-            trackedTypes.push(creatureType);
-            game.user.setFlag(MODULE_ID, `thoroughReports.${actorId}`, trackedTypes);
-            console.log(`${MODULE_TITLE} | Tracked new creature type for Thorough Reports: ${creatureType}`);
-        }
-    }
-
-    /**
-     * Check if actor gets Thorough Reports bonus against this creature
-     */
-    checkThoroughReportsBonus(actor, targetActor, skillKey) {
-        // Must have the feat
-        if (!this.hasThoroughReportsFeat(actor)) {
-            return 0;
-        }
-
-        // Get creature type
-        const creatureType = this.getCreatureType(targetActor);
-        if (!creatureType) {
-            return 0;
-        }
-
-        // Check if we've tracked this type before
-        const actorId = actor.id;
-        const trackedTypes = game.user.getFlag(MODULE_ID, `thoroughReports.${actorId}`) || [];
-
-        if (!trackedTypes.includes(creatureType)) {
-            return 0; // Haven't successfully identified this type before
-        }
-
-        // Base bonus is +2
-        let bonus = 2;
-
-        // Check for Scrollmaster Dedication (increases to +4 if expert in skill)
-        if (this.hasScrollmasterDedication(actor)) {
-            const skill = actor.system.skills?.[skillKey];
-            const rank = skill?.rank ?? 0;
-
-            // Expert = rank 2, Master = rank 3, Legendary = rank 4
-            if (rank >= 2) {
-                bonus = 4;
-                console.log(`${MODULE_TITLE} | Scrollmaster Dedication increases bonus to +4`);
-            }
-        }
-
-        return bonus;
-    }
-
-    /**
-     * Reveal the selected information to the player
-     */
-    revealSelectedInformation(actor, target, selectedInfoIds, isFalseInfo = false, chatMessage = null) {
-        if (selectedInfoIds.length === 0) {
-            ui.notifications.info('No information selected.');
-            return;
-        }
-
-        // Handle both Token objects and Actor objects
-        const targetActor = target.actor || target;
-        const targetName = target.name || target.actor?.name || 'Unknown';
-
-        if (!targetActor || !targetActor.system) {
-            ui.notifications.error('Target actor not found.');
-            console.error('Target object:', target);
-            return;
-        }
-
-        let learnedContent = '';
-
-        for (const infoId of selectedInfoIds) {
-            if (isFalseInfo) {
-                // Generate false information for critical failure
-                learnedContent += this.generateFalseInformation(infoId);
-            } else {
-                // Generate real information
-                switch (infoId) {
-                    case 'highest-save':
-                        const highestSave = this.getHighestSave(targetActor);
-                        learnedContent += `<div class="rk-learned-item"><strong>Highest Save:</strong> ${highestSave}</div>`;
-                        break;
-
-                    case 'lowest-save':
-                        const lowestSave = this.getLowestSave(targetActor);
-                        learnedContent += `<div class="rk-learned-item"><strong>Lowest Save:</strong> ${lowestSave}</div>`;
-                        break;
-
-                    case 'resistances':
-                        const resistances = this.getResistances(targetActor);
-                        learnedContent += `<div class="rk-learned-item"><strong>Resistances:</strong> ${resistances || 'None'}</div>`;
-                        break;
-
-                    case 'weaknesses':
-                        const weaknesses = this.getWeaknesses(targetActor);
-                        learnedContent += `<div class="rk-learned-item"><strong>Weaknesses:</strong> ${weaknesses || 'None'}</div>`;
-                        break;
-
-                    case 'immunities':
-                        const immunities = this.getImmunities(targetActor);
-                        learnedContent += `<div class="rk-learned-item"><strong>Immunities:</strong> ${immunities || 'None'}</div>`;
-                        break;
-
-                    case 'attacks':
-                        const attacks = this.getAttacks(targetActor);
-                        learnedContent += `<div class="rk-learned-item"><strong>Special Attacks:</strong> ${attacks || 'None known'}</div>`;
-                        break;
-
-                    case 'special-abilities':
-                        const abilities = this.getSpecialAbilities(targetActor);
-                        learnedContent += `<div class="rk-learned-item"><strong>Special Abilities:</strong> ${abilities || 'None known'}</div>`;
-                        break;
-                }
-            }
-        }
-
-        // If we have a chat message to update, update it
-        if (chatMessage) {
-            const shareWithParty = game.settings.get(MODULE_ID, 'shareWithParty');
-
-            // Update the learned content in the existing message
-            let newContent = chatMessage.content;
-            const learnedSection = `<div class="rk-learned-content">${learnedContent}</div>`;
-            newContent = newContent.replace(/<div class="rk-learned-content">.*?<\/div>/s, learnedSection);
-
-            // Determine whisper targets based on share setting
-            let whisperList;
-            if (shareWithParty) {
-                // Everyone can see it (no whisper means visible to all)
-                whisperList = [];
-            } else {
-                // Only the player who rolled and GMs can see it
-                whisperList = [game.user.id, ...game.users.filter(u => u.isGM).map(u => u.id)];
-            }
-
-            chatMessage.update({
-                content: newContent,
-                whisper: whisperList
-            });
-        } else {
-            // Fallback: create a separate message (old behavior)
-            let content = `<h3>Recalled Information about ${targetName}</h3>`;
-            content += `<p><em>Learned ${selectedInfoIds.length} piece${selectedInfoIds.length !== 1 ? 's' : ''} of information</em></p>`;
-            content += `<div>${learnedContent}</div>`;
-
-            const chatData = {
-                user: game.user.id,
-                speaker: ChatMessage.getSpeaker({ actor }),
-                content: content,
-                whisper: [game.user.id]
-            };
-
-            ChatMessage.create(chatData);
-        }
-    }
-
-    /**
-     * Generate false information for critical failures
-     */
-    generateFalseInformation(infoId) {
-        const saves = ['Fortitude', 'Reflex', 'Will'];
-        const damageTypes = ['fire', 'cold', 'electricity', 'acid', 'poison', 'sonic', 'force', 'negative', 'positive', 'mental', 'slashing', 'piercing', 'bludgeoning'];
-        const skillsList = ['Acrobatics', 'Arcana', 'Athletics', 'Crafting', 'Deception', 'Diplomacy', 'Intimidation', 'Medicine', 'Nature', 'Occultism', 'Performance', 'Religion', 'Society', 'Stealth', 'Survival', 'Thievery'];
-
-        const randomNumber = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-        const randomElement = (arr) => arr[Math.floor(Math.random() * arr.length)];
-        const randomDamageTypes = () => {
-            const count = randomNumber(1, 3);
-            const selected = [];
-            for (let i = 0; i < count; i++) {
-                const type = randomElement(damageTypes.filter(t => !selected.includes(t)));
-                selected.push(type);
-            }
-            return selected.join(', ');
-        };
-
-        switch (infoId) {
-            case 'highest-save':
-                return `<div class="rk-learned-item"><strong>Highest Save:</strong> ${randomElement(saves)} (+${randomNumber(5, 25)})</div>`;
-
-            case 'lowest-save':
-                return `<div class="rk-learned-item"><strong>Lowest Save:</strong> ${randomElement(saves)} (+${randomNumber(-2, 15)})</div>`;
-
-            case 'resistances':
-                return Math.random() > 0.5
-                    ? `<div class="rk-learned-item"><strong>Resistances:</strong> ${randomDamageTypes()} ${randomNumber(5, 15)}</div>`
-                    : `<div class="rk-learned-item"><strong>Resistances:</strong> None</div>`;
-
-            case 'weaknesses':
-                return Math.random() > 0.3
-                    ? `<div class="rk-learned-item"><strong>Weaknesses:</strong> ${randomDamageTypes()} ${randomNumber(5, 15)}</div>`
-                    : `<div class="rk-learned-item"><strong>Weaknesses:</strong> None</div>`;
-
-            case 'immunities':
-                return Math.random() > 0.6
-                    ? `<div class="rk-learned-item"><strong>Immunities:</strong> ${randomDamageTypes()}</div>`
-                    : `<div class="rk-learned-item"><strong>Immunities:</strong> None</div>`;
-
-            case 'attacks':
-                const attackTypes = ['melee', 'ranged'];
-                const attackNames = ['claw', 'bite', 'fist', 'tail', 'horn', 'slam', 'tentacle', 'longbow', 'crossbow'];
-                const attackCount = randomNumber(1, 3);
-                const attacks = [];
-                for (let i = 0; i < attackCount; i++) {
-                    const type = randomElement(attackTypes);
-                    const name = randomElement(attackNames);
-                    const bonus = randomNumber(5, 25);
-                    const damage = `${randomNumber(1, 3)}d${randomElement([4, 6, 8, 10, 12])}+${randomNumber(0, 10)}`;
-                    attacks.push(`${name} (${type} +${bonus}, ${damage} ${randomElement(damageTypes.slice(0, 5))})`);
-                }
-                return `<div class="rk-learned-item"><strong>Attacks:</strong> ${attacks.join(', ')}</div>`;
-
-            case 'skills':
-                const skillCount = randomNumber(2, 5);
-                const skills = [];
-                for (let i = 0; i < skillCount; i++) {
-                    const skill = randomElement(skillsList.filter(s => !skills.some(sk => sk.includes(s))));
-                    skills.push(`${skill} +${randomNumber(5, 25)}`);
-                }
-                return `<div class="rk-learned-item"><strong>Skills:</strong> ${skills.join(', ')}</div>`;
-
-            case 'background':
-                const falseBackgrounds = [
-                    'This creature is known to be peaceful and rarely attacks.',
-                    'Legends say this creature can speak Common fluently.',
-                    'This creature is said to be vulnerable during the day.',
-                    'Stories tell of this creature\'s ability to turn invisible at will.',
-                    'This creature is believed to be attracted to shiny objects.',
-                    'Ancient texts claim this creature fears running water.',
-                    'This creature is rumored to have exceptional hearing.',
-                    'Scholars believe this creature can regenerate lost limbs.'
-                ];
-                return `<div class="rk-learned-item"><strong>Background:</strong> ${randomElement(falseBackgrounds)}</div>`;
-
-            case 'special-attacks':
-                const specialAttacks = [
-                    'breath weapon (3d6 fire, DC 20 Reflex)',
-                    'paralyzing touch (Fort DC 18)',
-                    'death gaze (Will DC 22)',
-                    'poison (1d6 poison per round)',
-                    'web attack (Reflex DC 16)'
-                ];
-                return `<div class="rk-learned-item"><strong>Special Attacks:</strong> ${randomElement(specialAttacks)}</div>`;
-
-            case 'special-abilities':
-                const specialAbilities = [
-                    'darkvision 60 ft., low-light vision',
-                    'regeneration 5 (acid or fire)',
-                    'spell resistance 15',
-                    'telepathy 100 ft.',
-                    'tremorsense 30 ft.'
-                ];
-                return `<div class="rk-learned-item"><strong>Special Abilities:</strong> ${randomElement(specialAbilities)}</div>`;
-
-            default:
-                return `<div class="rk-learned-item"><strong>${infoId}:</strong> You recall something, but you're not quite sure what...</div>`;
-        }
-    }
-
-    /**
-     * Helper methods to extract creature information
-     */
-    getHighestSave(actor) {
-        const saves = actor.system.saves || {};
-        let highest = { name: 'Unknown', value: -999 };
-
-        for (const [key, save] of Object.entries(saves)) {
-            const value = save.totalModifier ?? save.mod ?? save.value ?? 0;
-            if (value > highest.value) {
-                highest = { name: save.label || key, value: value };
-            }
-        }
-
-        return `${highest.name} (+${highest.value})`;
-    }
-
-    getLowestSave(actor) {
-        const saves = actor.system.saves || {};
-        let lowest = { name: 'Unknown', value: 999 };
-
-        for (const [key, save] of Object.entries(saves)) {
-            const value = save.totalModifier ?? save.mod ?? save.value ?? 0;
-            if (value < lowest.value) {
-                lowest = { name: save.label || key, value: value };
-            }
-        }
-
-        return `${lowest.name} (+${lowest.value})`;
-    }
-
-    getResistances(actor) {
-        const resistances = actor.system.traits?.dr || actor.system.attributes?.resistances || [];
-        if (Array.isArray(resistances) && resistances.length > 0) {
-            return resistances.map(r => `${r.type} ${r.value}`).join(', ');
-        }
-        return null;
-    }
-
-    getWeaknesses(actor) {
-        const weaknesses = actor.system.traits?.dv || actor.system.attributes?.weaknesses || [];
-        if (Array.isArray(weaknesses) && weaknesses.length > 0) {
-            return weaknesses.map(w => `${w.type} ${w.value}`).join(', ');
-        }
-        return null;
-    }
-
-    getImmunities(actor) {
-        const immunities = actor.system.traits?.di || actor.system.attributes?.immunities || [];
-        if (Array.isArray(immunities) && immunities.length > 0) {
-            return immunities.map(i => i.type || i).join(', ');
-        }
-        return null;
-    }
-
-    getCreatureBackground(actor) {
-        return actor.system.details?.publicNotes ||
-            actor.system.details?.biography?.value ||
-            'No background information available.';
-    }
-
-    getSpecialAttacks(actor) {
-        const attacks = [];
-
-        // Check for special attack items
-        if (actor.items) {
-            for (const item of actor.items) {
-                if (item.type === 'action' && item.system?.actionType?.value === 'attack') {
-                    if (item.system?.traits?.value?.some(t => t.includes('special'))) {
-                        attacks.push(item.name);
-                    }
-                }
-            }
-        }
-
-        return attacks.length > 0 ? attacks.join(', ') : null;
-    }
-
-    getSpecialAbilities(actor) {
-        const abilities = [];
-
-        // Check for special abilities
-        if (actor.items) {
-            for (const item of actor.items) {
-                if (item.type === 'action' || item.type === 'feat') {
-                    if (item.system?.traits?.value?.some(t => ['reaction', 'free-action'].includes(t))) {
-                        abilities.push(item.name);
-                    }
-                }
-            }
-        }
-
-        // Limit to first 5 abilities to avoid overwhelming info
-        return abilities.length > 0 ? abilities.slice(0, 5).join(', ') : null;
-    }
-
-    getAttacks(actor) {
-        const attacks = [];
-
-        // Get strike actions from PF2e actor
-        if (actor.items) {
-            for (const item of actor.items) {
-                // Check for melee/weapon items
-                if (item.type === 'melee') {
-                    const name = item.name;
-                    const attackMod = item.system?.bonus?.value ?? '?';
-
-                    // Get damage - PF2e stores damage in system.damageRolls array
-                    let damageStr = '?';
-                    if (item.system?.damageRolls && Object.keys(item.system.damageRolls).length > 0) {
-                        const damageRolls = [];
-                        for (const [key, roll] of Object.entries(item.system.damageRolls)) {
-                            if (roll.damage) {
-                                damageRolls.push(roll.damage);
-                            }
-                        }
-                        damageStr = damageRolls.join(' plus ');
-                    }
-
-                    attacks.push(`${name} ${attackMod >= 0 ? '+' : ''}${attackMod} (${damageStr})`);
-                }
-            }
-        }
-
-        return attacks.length > 0 ? attacks.slice(0, 5).join('; ') : 'No attacks found';
-    }
-
-    getSkills(actor) {
-        const skills = [];
-
-        // Get all trained or better skills
-        if (actor.system?.skills) {
-            for (const [key, skill] of Object.entries(actor.system.skills)) {
-                // For creatures, check if they have a base value (indicating they know the skill)
-                // For PCs, rank > 0 indicates trained or better
-                const base = skill.base ?? 0;
-                const rank = skill.rank ?? 0;
-
-                // Include skill if creature has base value OR PC has training
-                if (base > 0 || rank > 0) {
-                    const modifier = skill.mod ?? skill.totalModifier ?? skill.value ?? 0;
-                    const modifierText = modifier >= 0 ? `+${modifier}` : modifier;
-                    const label = skill.label || key.charAt(0).toUpperCase() + key.slice(1);
-                    skills.push(`${label} ${modifierText}`);
-                }
-            }
-        }
-
-        return skills.length > 0 ? skills.join(', ') : 'No trained skills';
-    }
-
-    revealInformation(target, degree, infoCount = 1) {
-        const revealableInfo = game.settings.get(MODULE_ID, 'revealableInfo');
-        const infoToReveal = revealableInfo[degree] || [];
-
-        if (infoToReveal.length === 0 || infoCount === 0) {
-            return;
-        }
-
-        // Limit information revealed to the calculated count
-        const limitedInfo = infoToReveal.slice(0, infoCount);
-
-        let content = `<h3>Recalled Information about ${target.name}</h3>`;
-        content += `<p><em>Learned ${infoCount} piece${infoCount !== 1 ? 's' : ''} of information</em></p>`;
-        content += `<ul>`;
-
-        for (const infoType of limitedInfo) {
-            switch (infoType) {
-                case 'name':
-                    content += `<li><strong>Name:</strong> ${target.name}</li>`;
-                    break;
-                case 'type':
-                    content += `<li><strong>Type:</strong> ${target.actor?.system?.details?.creatureType || 'Unknown'}</li>`;
-                    break;
-                case 'level':
-                    content += `<li><strong>Level:</strong> ${target.actor?.system?.details?.level?.value || 'Unknown'}</li>`;
-                    break;
-                case 'ac':
-                    content += `<li><strong>AC:</strong> ${target.actor?.system?.attributes?.ac?.value || 'Unknown'}</li>`;
-                    break;
-                case 'hp':
-                    content += `<li><strong>HP:</strong> ${target.actor?.system?.attributes?.hp?.max || 'Unknown'}</li>`;
-                    break;
-                case 'traits':
-                    const traits = target.actor?.system?.traits?.value || [];
-                    if (traits.length > 0) {
-                        content += `<li><strong>Traits:</strong> ${traits.join(', ')}</li>`;
-                    }
-                    break;
-            }
-        }
-
-        content += '</ul>';
-
-        const chatData = {
-            user: game.user.id,
-            content: content,
-            whisper: [game.user.id]
-        };
-
-        ChatMessage.create(chatData);
-    }
-}
-
-/**
- * Configuration dialog for Thorough Reports creature types
- */
-class ThoroughReportsConfig extends FormApplication {
-    static get defaultOptions() {
-        return mergeObject(super.defaultOptions, {
-            id: 'thorough-reports-config',
-            title: 'Thorough Reports - Creature Types',
-            template: null, // Use custom rendering instead
-            width: 500,
-            height: 'auto',
-            closeOnSubmit: true
-        });
-    }
-
-    getData() {
-        // Get actor
-        let actor = null;
-        const controlled = canvas.tokens?.controlled;
-        if (controlled && controlled.length > 0) {
-            actor = controlled[0].actor;
-        } else {
-            actor = game.user.character;
-        }
-
-        if (!actor) {
-            return { error: 'No character selected', creatureTypes: [] };
-        }
-
-        const actorId = actor.id;
-        const trackedTypes = game.user.getFlag(MODULE_ID, `thoroughReports.${actorId}`) || [];
-
-        // PF2e creature types
-        const allCreatureTypes = [
-            { key: 'aberration', label: 'Aberration' },
-            { key: 'animal', label: 'Animal' },
-            { key: 'astral', label: 'Astral' },
-            { key: 'beast', label: 'Beast' },
-            { key: 'celestial', label: 'Celestial' },
-            { key: 'construct', label: 'Construct' },
-            { key: 'dragon', label: 'Dragon' },
-            { key: 'elemental', label: 'Elemental' },
-            { key: 'ethereal', label: 'Ethereal' },
-            { key: 'fey', label: 'Fey' },
-            { key: 'fiend', label: 'Fiend' },
-            { key: 'fungus', label: 'Fungus' },
-            { key: 'giant', label: 'Giant' },
-            { key: 'humanoid', label: 'Humanoid' },
-            { key: 'monitor', label: 'Monitor' },
-            { key: 'ooze', label: 'Ooze' },
-            { key: 'plant', label: 'Plant' },
-            { key: 'undead', label: 'Undead' }
-        ];
-
-        const creatureTypes = allCreatureTypes.map(type => ({
-            ...type,
-            tracked: trackedTypes.includes(type.key)
-        }));
-
-        // Check if actor has Thorough Reports feat
-        const hasFeat = actor?.items?.some(item =>
-            item.type === 'feat' &&
-            (item.name.toLowerCase().includes('thorough reports') ||
-                item.slug === 'thorough-reports')
-        );
-
-        return {
-            error: null,
-            actorName: actor.name,
-            actorId: actorId,
-            hasFeat: hasFeat,
-            creatureTypes: creatureTypes
-        };
-    }
-
-    activateListeners(html) {
-        super.activateListeners(html);
-    }
-
-    async _updateObject(event, formData) {
-        // Get actor
-        let actor = null;
-        const controlled = canvas.tokens?.controlled;
-        if (controlled && controlled.length > 0) {
-            actor = controlled[0].actor;
-        } else {
-            actor = game.user.character;
-        }
-
-        if (!actor) {
-            ui.notifications.error('No character selected.');
-            return;
-        }
-
-        const actorId = actor.id;
-        const trackedTypes = [];
-
-        // Collect all checked creature types
-        for (const [key, value] of Object.entries(formData)) {
-            if (key.startsWith('type-') && value === true) {
-                const typeKey = key.replace('type-', '');
-                trackedTypes.push(typeKey);
-            }
-        }
-
-        // Save to user flags
-        await game.user.setFlag(MODULE_ID, `thoroughReports.${actorId}`, trackedTypes);
-        ui.notifications.info(`Thorough Reports creature types updated for ${actor.name}.`);
-    }
-
-    render(force, options) {
-        // Skip template loading, go directly to inline dialog
-        this._renderInline();
-        return this;
-    }
-
-    async _renderInline() {
-        // Check if we have a character selected
-        let actor = null;
-        const controlled = canvas.tokens?.controlled;
-        if (controlled && controlled.length > 0) {
-            actor = controlled[0].actor;
-        } else {
-            actor = game.user.character;
-        }
-
-        if (!actor) {
-            new Dialog({
-                title: 'Thorough Reports Configuration',
-                content: '<p>Please select a character token or assign a character to your user to configure Thorough Reports.</p>',
-                buttons: {
-                    ok: { label: 'OK' }
-                }
-            }).render(true);
-            return;
-        }
-
-        const data = this.getData();
-
-        if (data.error) {
-            new Dialog({
-                title: 'Thorough Reports Configuration',
-                content: `<p>${data.error}</p>`,
-                buttons: {
-                    ok: { label: 'OK' }
-                }
-            }).render(true);
-            return;
-        }
-
-        let content = '<form style="padding: 8px;">';
-
-        if (!data.hasFeat) {
-            content += '<p style="color: #856404; background: #fff3cd; padding: 8px; border: 1px solid #ffc107; border-radius: 4px; margin-bottom: 12px;">';
-            content += '<strong>Note:</strong> Your character does not have the Thorough Reports feat. This configuration will have no effect.';
-            content += '</p>';
-        }
-
-        content += `<p><strong>Character:</strong> ${data.actorName}</p>`;
-        content += '<p style="margin-bottom: 12px;">Select the creature types you have successfully identified with Recall Knowledge to gain the Thorough Reports bonus (+2, or +4 with Scrollmaster Dedication) on future checks:</p>';
-        content += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">';
-
-        for (const type of data.creatureTypes) {
-            content += `
-                <label style="display: flex; align-items: center; cursor: pointer;">
-                    <input type="checkbox" name="type-${type.key}" ${type.tracked ? 'checked' : ''} style="margin-right: 8px;">
-                    <span>${type.label}</span>
-                </label>
-            `;
-        }
-
-        content += '</div></form>';
-
-        new Dialog({
-            title: 'Thorough Reports - Creature Types',
-            content: content,
-            buttons: {
-                save: {
-                    icon: '<i class="fas fa-check"></i>',
-                    label: 'Save',
-                    callback: async (html) => {
-                        const formData = {};
-                        html.find('input[type="checkbox"]').each(function () {
-                            const name = $(this).attr('name');
-                            formData[name] = $(this).is(':checked');
-                        });
-                        await this._updateObject(null, formData);
-                    }
-                },
-                cancel: {
-                    icon: '<i class="fas fa-times"></i>',
-                    label: 'Cancel'
-                }
-            },
-            default: 'save'
-        }, {
-            width: 500
-        }).render(true);
-    }
-}
-
-/**
- * Configuration dialog for Bestiary Scholar feat
- */
-// Initialize module when ready
-let recallKnowledgeModule;
-
-Hooks.once('init', () => {
-    console.log(`${MODULE_TITLE} | Init hook firing...`);
-
-    try {
-        recallKnowledgeModule = new RecallKnowledgeModule();
-
-        // Expose basic API immediately so macros can check for module availability
-        const basicAPI = {
-            module: recallKnowledgeModule,
-            isInitialized: () => recallKnowledgeModule?.initialized || false
-        };
-        globalThis.RecallKnowledge = basicAPI;
-        game.RecallKnowledge = basicAPI;
-
-        console.log(`${MODULE_TITLE} | Module created, basic API exposed`, {
-            "globalThis.RecallKnowledge": !!globalThis.RecallKnowledge,
-            "game.RecallKnowledge": !!game.RecallKnowledge
-        });
-    } catch (error) {
-        console.error(`${MODULE_TITLE} | Error during init:`, error);
-    }
-});
-
-Hooks.once('ready', () => {
-    console.log(`${MODULE_TITLE} | Ready hook firing...`);
-
-    if (recallKnowledgeModule) {
-        try {
-            recallKnowledgeModule.initialize();
-            console.log(`${MODULE_TITLE} | Module initialization completed`);
-        } catch (error) {
-            console.error(`${MODULE_TITLE} | Error during ready initialization:`, error);
-        }
+    this.registeredHooks.get(event).push(callback);
+    if (once) {
+      Hooks.once(event, callback);
     } else {
-        console.error(`${MODULE_TITLE} | recallKnowledgeModule is null in ready hook`);
+      Hooks.on(event, callback);
     }
-});
-
-// Reset Diverse Recognition usage at the start of each round
-Hooks.on('combatRound', async (combat, updateData, updateOptions) => {
-    if (!recallKnowledgeModule) return;
-
-    // Reset for all actors in the combat
-    for (const combatant of combat.combatants) {
-        if (combatant.actor) {
-            await recallKnowledgeModule.recallKnowledgeManager.resetDiverseRecognitionUsage(combatant.actor.id);
+  }
+  /**
+   * Unregister all hooks for this module
+   */
+  unregisterAllHooks() {
+    for (const [event, callbacks] of this.registeredHooks) {
+      callbacks.forEach((callback) => {
+      });
+    }
+    this.registeredHooks.clear();
+  }
+  // =============================================================================
+  // Hook Handlers
+  // =============================================================================
+  /**
+   * Handle init hook
+   */
+  onInit() {
+    console.log(`${MODULE_ID} | Init hook triggered`);
+  }
+  /**
+   * Handle ready hook
+   */
+  onReady() {
+    console.log(`${MODULE_ID} | Ready hook triggered`);
+    this.setupUI();
+    this.initializeReadyFeatures();
+  }
+  /**
+   * Handle canvas ready hook
+   */
+  onCanvasReady(canvas) {
+    console.log(`${MODULE_ID} | Canvas ready hook triggered`);
+  }
+  /**
+   * Handle actor creation
+   */
+  onCreateActor(actor, options, userId) {
+    console.log(`${MODULE_ID} | Actor created: ${actor.name}`);
+    this.applyDefaultActorRules(actor);
+  }
+  /**
+   * Handle actor updates
+   */
+  onUpdateActor(actor, updateData, options, userId) {
+    console.log(`${MODULE_ID} | Actor updated: ${actor.name}`);
+    this.processActorUpdate(actor, updateData);
+  }
+  /**
+   * Handle actor deletion
+   */
+  onDeleteActor(actor, options, userId) {
+    console.log(`${MODULE_ID} | Actor deleted: ${actor.name}`);
+    this.cleanupActorData(actor);
+  }
+  /**
+   * Handle item creation
+   */
+  onCreateItem(item, options, userId) {
+    console.log(`${MODULE_ID} | Item created: ${item.name}`);
+    this.processItemRules(item);
+  }
+  /**
+   * Handle item updates
+   */
+  onUpdateItem(item, updateData, options, userId) {
+    console.log(`${MODULE_ID} | Item updated: ${item.name}`);
+    this.processItemRules(item);
+  }
+  /**
+   * Handle item deletion
+   */
+  onDeleteItem(item, options, userId) {
+    console.log(`${MODULE_ID} | Item deleted: ${item.name}`);
+    this.cleanupItemRules(item);
+  }
+  /**
+   * Handle chat message creation
+   */
+  onCreateChatMessage(message, options, userId) {
+    if (this.isKnowledgeCheck(message)) {
+      this.processKnowledgeCheck(message);
+    }
+  }
+  /**
+   * Handle chat message rendering
+   */
+  onRenderChatMessage(message, html, data) {
+    this.enhanceChatMessage(message, html, data);
+  }
+  /**
+   * Handle combat start
+   */
+  onCombatStart(combat) {
+    console.log(`${MODULE_ID} | Combat started`);
+    this.initializeCombatTracking(combat);
+  }
+  /**
+   * Handle combat turn
+   */
+  onCombatTurn(combat, updateData, options) {
+    console.log(`${MODULE_ID} | Combat turn changed`);
+    this.processCombatTurn(combat);
+  }
+  /**
+   * Handle combat end
+   */
+  onCombatEnd(combat) {
+    console.log(`${MODULE_ID} | Combat ended`);
+    this.cleanupCombatTracking(combat);
+  }
+  /**
+   * Handle token control
+   */
+  onControlToken(token, controlled) {
+    if (controlled) {
+      console.log(`${MODULE_ID} | Token controlled: ${token.name}`);
+      this.displayTokenKnowledge(token);
+    }
+  }
+  /**
+   * Handle token updates
+   */
+  onUpdateToken(token, updateData, options, userId) {
+    this.processTokenUpdate(token, updateData);
+  }
+  /**
+   * Handle dice rolls (if Dice So Nice is installed)
+   */
+  onDiceRolled(roll) {
+    this.processDiceRoll(roll);
+  }
+  // =============================================================================
+  // Helper Methods
+  // =============================================================================
+  /**
+   * Setup UI elements
+   */
+  setupUI() {
+  }
+  /**
+   * Initialize features that require the ready hook
+   */
+  initializeReadyFeatures() {
+  }
+  /**
+   * Apply default rule elements to new actors
+   */
+  applyDefaultActorRules(actor) {
+  }
+  /**
+   * Process actor updates for rule elements
+   */
+  processActorUpdate(actor, updateData) {
+  }
+  /**
+   * Clean up actor-related data
+   */
+  cleanupActorData(actor) {
+  }
+  /**
+   * Process item rule elements
+   */
+  processItemRules(item) {
+  }
+  /**
+   * Clean up item rule elements
+   */
+  cleanupItemRules(item) {
+  }
+  /**
+   * Check if a chat message is a knowledge check
+   */
+  isKnowledgeCheck(message) {
+    return false;
+  }
+  /**
+   * Process knowledge check results
+   */
+  processKnowledgeCheck(message) {
+  }
+  /**
+   * Enhance chat messages with module features
+   */
+  enhanceChatMessage(message, html, data) {
+  }
+  /**
+   * Initialize combat tracking
+   */
+  initializeCombatTracking(combat) {
+  }
+  /**
+   * Process combat turn changes
+   */
+  processCombatTurn(combat) {
+  }
+  /**
+   * Clean up combat tracking
+   */
+  cleanupCombatTracking(combat) {
+  }
+  /**
+   * Display knowledge information for a token
+   */
+  displayTokenKnowledge(token) {
+  }
+  /**
+   * Process token updates
+   */
+  processTokenUpdate(token, updateData) {
+  }
+  /**
+   * Process dice rolls
+   */
+  processDiceRoll(roll) {
+  }
+}
+class RecallKnowledgeManager {
+  constructor() {
+    __publicField(this, "pendingRequests", /* @__PURE__ */ new Map());
+  }
+  /**
+   * Initiate a recall knowledge check from a player
+   */
+  async initiateRecallKnowledge(actor, target) {
+    var _a;
+    if (!actor || !target) {
+      ui.notifications.error(game.i18n.localize("recall-knowledge.errors.noTarget"));
+      return;
+    }
+    const settings = (_a = game.RecallKnowledge) == null ? void 0 : _a.settings;
+    if ((settings == null ? void 0 : settings.requiresGMApproval()) && !game.user.isGM) {
+      await this.requestGMApproval(actor, target);
+    } else {
+      await this.showSkillSelectionDialog(actor, target);
+    }
+  }
+  /**
+   * Request GM approval for recall knowledge
+   */
+  async requestGMApproval(actor, target) {
+    var _a, _b;
+    const requestId = foundry.utils.randomID();
+    const availableSkills = this.getAvailableSkills(actor);
+    const request = {
+      id: requestId,
+      playerId: game.user.id,
+      playerName: game.user.name,
+      actorId: actor.id,
+      targetId: target.id,
+      targetName: target.name,
+      timestamp: Date.now(),
+      availableSkills
+    };
+    this.pendingRequests.set(requestId, request);
+    const socketHandler = (_b = (_a = game.RecallKnowledge) == null ? void 0 : _a.module) == null ? void 0 : _b.socketHandler;
+    if (socketHandler) {
+      socketHandler.sendMessage("gmApprovalRequest", request, this.getGMUserIds());
+    }
+    ui.notifications.info(`Recall Knowledge request sent to GM for ${target.name}`);
+  }
+  /**
+   * Show GM approval dialog
+   */
+  async showGMApprovalDialog(request) {
+    if (!game.user.isGM) return;
+    const target = game.actors.get(request.targetId);
+    if (!target) return;
+    const content = this.generateGMApprovalHTML(request, target);
+    new Dialog({
+      title: game.i18n.localize("recall-knowledge.ui.gmApproval.title"),
+      content,
+      buttons: {
+        approve: {
+          icon: '<i class="fas fa-check"></i>',
+          label: game.i18n.localize("recall-knowledge.ui.gmApproval.approve"),
+          callback: (html) => this.approveRequest(request, html)
+        },
+        deny: {
+          icon: '<i class="fas fa-times"></i>',
+          label: game.i18n.localize("recall-knowledge.ui.gmApproval.deny"),
+          callback: () => this.denyRequest(request)
         }
+      },
+      default: "approve",
+      close: () => this.denyRequest(request)
+    }).render(true);
+  }
+  /**
+   * Approve GM request and initiate roll
+   */
+  async approveRequest(request, html) {
+    var _a, _b;
+    const selectedSkillKey = html.find('[name="selectedSkill"]:checked').val();
+    const customDC = parseInt(html.find('[name="customDC"]').val()) || null;
+    const selectedSkill = request.availableSkills.find((s) => s.key === selectedSkillKey);
+    if (!selectedSkill) return;
+    const actor = game.actors.get(request.actorId);
+    const target = game.actors.get(request.targetId);
+    if (!actor || !target) return;
+    const result = await this.performRecallKnowledgeRoll(actor, target, selectedSkill, customDC || void 0);
+    const socketHandler = (_b = (_a = game.RecallKnowledge) == null ? void 0 : _a.module) == null ? void 0 : _b.socketHandler;
+    if (socketHandler) {
+      socketHandler.sendMessage("recallKnowledgeResult", {
+        requestId: request.id,
+        result
+      }, [request.playerId]);
     }
+    if (result.success) {
+      await this.showInformationSelectionDialog(target, result, request.playerId);
+    }
+    this.pendingRequests.delete(request.id);
+  }
+  /**
+   * Deny GM request
+   */
+  denyRequest(request) {
+    var _a, _b;
+    const socketHandler = (_b = (_a = game.RecallKnowledge) == null ? void 0 : _a.module) == null ? void 0 : _b.socketHandler;
+    if (socketHandler) {
+      socketHandler.sendMessage("recallKnowledgeDenied", {
+        requestId: request.id,
+        reason: "GM denied the request"
+      }, [request.playerId]);
+    }
+    this.pendingRequests.delete(request.id);
+  }
+  /**
+   * Show skill selection dialog (for direct rolls)
+   */
+  async showSkillSelectionDialog(actor, target) {
+    const availableSkills = this.getAvailableSkills(actor);
+    const content = await renderTemplate("modules/recall-knowledge/templates/skill-selection.hbs", {
+      actor,
+      target,
+      skills: availableSkills
+    });
+    new Dialog({
+      title: game.i18n.localize("recall-knowledge.ui.knowledgeCheck.title"),
+      content,
+      buttons: {
+        roll: {
+          icon: '<i class="fas fa-dice-d20"></i>',
+          label: game.i18n.localize("recall-knowledge.ui.knowledgeCheck.roll"),
+          callback: (html) => this.handleDirectRoll(actor, target, html)
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: game.i18n.localize("recall-knowledge.ui.knowledgeCheck.cancel"),
+          callback: () => {
+          }
+        }
+      },
+      default: "roll"
+    }).render(true);
+  }
+  /**
+   * Handle direct roll without GM approval
+   */
+  async handleDirectRoll(actor, target, html) {
+    const selectedSkillKey = html.find('[name="selectedSkill"]:checked').val();
+    const availableSkills = this.getAvailableSkills(actor);
+    const selectedSkill = availableSkills.find((s) => s.key === selectedSkillKey);
+    if (!selectedSkill) return;
+    const result = await this.performRecallKnowledgeRoll(actor, target, selectedSkill);
+    if (result.success && game.user.isGM) {
+      await this.showInformationSelectionDialog(target, result);
+    }
+  }
+  /**
+   * Perform the actual recall knowledge roll
+   */
+  async performRecallKnowledgeRoll(actor, target, skill, customDC) {
+    const dc = customDC || this.calculateDefaultDC(target);
+    const roll = new Roll(`1d20 + ${skill.modifier}`);
+    await roll.evaluate();
+    const total = roll.total || 0;
+    const margin = total - dc;
+    let degree;
+    if (margin >= 10) degree = "criticalSuccess";
+    else if (margin >= 0) degree = "success";
+    else if (margin >= -10) degree = "failure";
+    else degree = "criticalFailure";
+    const success = degree === "success" || degree === "criticalSuccess";
+    await this.createRollChatMessage(actor, target, skill, roll, dc, degree);
+    const availableInfo = success ? this.getAvailableInformation(target, degree === "criticalSuccess") : [];
+    return {
+      success,
+      degree,
+      roll,
+      total,
+      dc,
+      skill,
+      availableInfo
+    };
+  }
+  /**
+   * Show information selection dialog to GM
+   */
+  async showInformationSelectionDialog(target, result, playerId) {
+    const content = await renderTemplate("modules/recall-knowledge/templates/information-selection.hbs", {
+      target,
+      result,
+      information: result.availableInfo
+    });
+    new Dialog({
+      title: game.i18n.localize("recall-knowledge.ui.informationReveal.title"),
+      content,
+      buttons: {
+        revealSelected: {
+          icon: '<i class="fas fa-eye"></i>',
+          label: game.i18n.localize("recall-knowledge.ui.informationReveal.revealSelected"),
+          callback: (html) => this.revealSelectedInformation(target, result, html, playerId)
+        },
+        revealAll: {
+          icon: '<i class="fas fa-eye-slash"></i>',
+          label: game.i18n.localize("recall-knowledge.ui.informationReveal.revealAll"),
+          callback: () => this.revealAllInformation(target, result, playerId)
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: game.i18n.localize("recall-knowledge.ui.informationReveal.cancel"),
+          callback: () => {
+          }
+        }
+      },
+      default: "revealSelected"
+    }).render(true);
+  }
+  /**
+   * Reveal selected information to player
+   */
+  async revealSelectedInformation(target, result, html, playerId) {
+    const selectedInfo = [];
+    html.find('[name="selectedInfo"]:checked').each((i, el) => {
+      const index = parseInt($(el).val());
+      if (result.availableInfo[index]) {
+        selectedInfo.push(result.availableInfo[index]);
+      }
+    });
+    await this.createInformationChatMessage(target, selectedInfo, playerId);
+  }
+  /**
+   * Reveal all available information to player
+   */
+  async revealAllInformation(target, result, playerId) {
+    await this.createInformationChatMessage(target, result.availableInfo, playerId);
+  }
+  /**
+   * Get available skills for an actor
+   */
+  getAvailableSkills(actor) {
+    var _a, _b, _c;
+    const skills = [];
+    const settings = (_a = game.RecallKnowledge) == null ? void 0 : _a.settings;
+    const knowledgeSkills = ["arcana", "nature", "occultism", "religion", "crafting"];
+    for (const skillKey of knowledgeSkills) {
+      const skill = (_c = (_b = actor.system) == null ? void 0 : _b.skills) == null ? void 0 : _c[skillKey];
+      if (skill) {
+        skills.push({
+          key: skillKey,
+          name: game.i18n.localize(`recall-knowledge.ui.knowledgeCheck.${skillKey}`),
+          modifier: skill.mod || 0,
+          isLore: false
+        });
+      }
+    }
+    if (settings == null ? void 0 : settings.shouldIncludeLoreSkills()) {
+      const loreSkills = this.getLoreSkills(actor);
+      skills.push(...loreSkills);
+    }
+    return skills.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  /**
+   * Get lore skills for an actor
+   */
+  getLoreSkills(actor) {
+    var _a;
+    const loreSkills = [];
+    if ((_a = actor.system) == null ? void 0 : _a.skills) {
+      for (const [key, skill] of Object.entries(actor.system.skills)) {
+        if (key.includes("lore") && skill.mod !== void 0) {
+          loreSkills.push({
+            key,
+            name: skill.name || key,
+            modifier: skill.mod || 0,
+            isLore: true
+          });
+        }
+      }
+    }
+    return loreSkills;
+  }
+  /**
+   * Calculate default DC for a creature
+   */
+  calculateDefaultDC(target) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    const settings = (_a = game.RecallKnowledge) == null ? void 0 : _a.settings;
+    if (!(settings == null ? void 0 : settings.shouldAutoCalculateDC())) {
+      return 15;
+    }
+    const method = settings.getDCCalculationMethod();
+    let level = 0;
+    switch (method) {
+      case "level":
+        level = ((_c = (_b = target.system) == null ? void 0 : _b.level) == null ? void 0 : _c.value) || ((_f = (_e = (_d = target.system) == null ? void 0 : _d.details) == null ? void 0 : _e.level) == null ? void 0 : _f.value) || 0;
+        break;
+      case "cr":
+        level = ((_h = (_g = target.system) == null ? void 0 : _g.details) == null ? void 0 : _h.cr) || ((_i = target.system) == null ? void 0 : _i.cr) || 0;
+        break;
+      default:
+        level = 0;
+    }
+    return Math.max(10, 10 + level);
+  }
+  /**
+   * Get available information about a creature
+   */
+  getAvailableInformation(target, criticalSuccess) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    const settings = (_a = game.RecallKnowledge) == null ? void 0 : _a.settings;
+    const revealableInfo = (settings == null ? void 0 : settings.getRevealableInfo()) || {};
+    const information = [];
+    if ((_b = revealableInfo.basicInfo) == null ? void 0 : _b.visible) {
+      information.push({
+        category: "basic",
+        label: "Name and Type",
+        value: `${target.name} (${((_e = (_d = (_c = target.system) == null ? void 0 : _c.traits) == null ? void 0 : _d.value) == null ? void 0 : _e.join(", ")) || "Unknown type"})`,
+        requiresSuccess: false,
+        requiresCriticalSuccess: false,
+        gmOnly: revealableInfo.basicInfo.gmOnly,
+        revealed: false
+      });
+    }
+    if ((_f = revealableInfo.ac) == null ? void 0 : _f.visible) {
+      const ac = ((_i = (_h = (_g = target.system) == null ? void 0 : _g.attributes) == null ? void 0 : _h.ac) == null ? void 0 : _i.value) || ((_k = (_j = target.system) == null ? void 0 : _j.ac) == null ? void 0 : _k.value) || "Unknown";
+      information.push({
+        category: "defense",
+        label: "Armor Class",
+        value: `AC ${ac}`,
+        requiresSuccess: true,
+        requiresCriticalSuccess: false,
+        gmOnly: revealableInfo.ac.gmOnly,
+        revealed: false
+      });
+    }
+    if ((_l = revealableInfo.resistances) == null ? void 0 : _l.visible) {
+      const resistances = this.getResistancesText(target);
+      if (resistances) {
+        information.push({
+          category: "defense",
+          label: "Resistances/Immunities",
+          value: resistances,
+          requiresSuccess: true,
+          requiresCriticalSuccess: false,
+          gmOnly: revealableInfo.resistances.gmOnly,
+          revealed: false
+        });
+      }
+    }
+    if ((_m = revealableInfo.weaknesses) == null ? void 0 : _m.visible) {
+      const weaknesses = this.getWeaknessesText(target);
+      if (weaknesses) {
+        information.push({
+          category: "defense",
+          label: "Weaknesses",
+          value: weaknesses,
+          requiresSuccess: true,
+          requiresCriticalSuccess: false,
+          gmOnly: revealableInfo.weaknesses.gmOnly,
+          revealed: false
+        });
+      }
+    }
+    if (((_n = revealableInfo.saves) == null ? void 0 : _n.visible) && criticalSuccess) {
+      const saves = this.getSavesText(target);
+      if (saves) {
+        information.push({
+          category: "defense",
+          label: "Saving Throws",
+          value: saves,
+          requiresSuccess: false,
+          requiresCriticalSuccess: true,
+          gmOnly: revealableInfo.saves.gmOnly,
+          revealed: false
+        });
+      }
+    }
+    return information;
+  }
+  /**
+   * Get resistances text for a creature
+   */
+  getResistancesText(target) {
+    var _a, _b, _c, _d, _e, _f;
+    const resistances = ((_b = (_a = target.system) == null ? void 0 : _a.traits) == null ? void 0 : _b.dr) || ((_c = target.system) == null ? void 0 : _c.resistances) || [];
+    const immunities = ((_e = (_d = target.system) == null ? void 0 : _d.traits) == null ? void 0 : _e.di) || ((_f = target.system) == null ? void 0 : _f.immunities) || [];
+    const parts = [];
+    if (resistances.length > 0) parts.push(`Resistance: ${resistances.join(", ")}`);
+    if (immunities.length > 0) parts.push(`Immunity: ${immunities.join(", ")}`);
+    return parts.join("; ");
+  }
+  /**
+   * Get weaknesses text for a creature
+   */
+  getWeaknessesText(target) {
+    var _a, _b, _c;
+    const weaknesses = ((_b = (_a = target.system) == null ? void 0 : _a.traits) == null ? void 0 : _b.dv) || ((_c = target.system) == null ? void 0 : _c.weaknesses) || [];
+    return weaknesses.length > 0 ? `Weakness: ${weaknesses.join(", ")}` : "";
+  }
+  /**
+   * Get saving throws text for a creature
+   */
+  getSavesText(target) {
+    var _a;
+    const saves = ((_a = target.system) == null ? void 0 : _a.saves) || {};
+    const saveTexts = [];
+    for (const [save, data] of Object.entries(saves)) {
+      if (data.value !== void 0) {
+        saveTexts.push(`${save.toUpperCase()}: +${data.value}`);
+      }
+    }
+    return saveTexts.join(", ");
+  }
+  /**
+   * Create chat message for the roll result
+   */
+  async createRollChatMessage(actor, target, skill, roll, dc, degree) {
+    const content = `
+      <div class="recall-knowledge-roll">
+        <h3>${actor.name} attempts to recall knowledge about ${target.name}</h3>
+        <div class="roll-details">
+          <p><strong>Skill:</strong> ${skill.name}</p>
+          <p><strong>Result:</strong> ${degree}</p>
+          <div class="dice-roll">
+            ${roll.result} = ${roll.total} vs DC ${dc}
+          </div>
+        </div>
+      </div>
+    `;
+    await ChatMessage.create({
+      user: game.user.id,
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content,
+      type: CONST.CHAT_MESSAGE_TYPES.ROLL,
+      roll,
+      sound: CONFIG.sounds.dice
+    });
+  }
+  /**
+   * Create chat message for revealed information
+   */
+  async createInformationChatMessage(target, information, playerId) {
+    if (information.length === 0) return;
+    const content = `
+      <div class="recall-knowledge-information">
+        <h3>Knowledge about ${target.name}</h3>
+        <ul>
+          ${information.map((info) => `<li><strong>${info.label}:</strong> ${info.value}</li>`).join("")}
+        </ul>
+      </div>
+    `;
+    const messageData = {
+      user: game.user.id,
+      content,
+      type: CONST.CHAT_MESSAGE_TYPES.OTHER
+    };
+    if (playerId) {
+      messageData.whisper = [playerId];
+    }
+    await ChatMessage.create(messageData);
+  }
+  /**
+   * Get GM user IDs
+   */
+  getGMUserIds() {
+    return game.users.filter((user) => user.isGM).map((user) => user.id);
+  }
+  /**
+   * Generate HTML for GM approval dialog
+   */
+  generateGMApprovalHTML(request, target) {
+    const skillsHTML = request.availableSkills.map(
+      (skill, index) => `<div>
+        <input type="radio" name="selectedSkill" value="${skill.key}" id="skill-${index}" ${index === 0 ? "checked" : ""}>
+        <label for="skill-${index}">${skill.name} (+${skill.modifier})</label>
+      </div>`
+    ).join("");
+    return `
+      <div class="recall-knowledge-gm-approval">
+        <p><strong>${request.playerName}</strong> wants to recall knowledge about <strong>${target.name}</strong></p>
+        
+        <div class="form-group">
+          <label>Select which skill the player should use:</label>
+          <div class="skill-selection">
+            ${skillsHTML}
+          </div>
+        </div>
 
-    console.log(`${MODULE_TITLE} | Reset Diverse Recognition usage for new round`);
+        <div class="form-group">
+          <label for="customDC">Custom DC (optional):</label>
+          <input type="number" name="customDC" id="customDC" value="${this.calculateDefaultDC(target)}" min="5" max="50">
+        </div>
+      </div>
+    `;
+  }
+  /**
+   * Generate HTML for skill selection dialog
+   */
+  generateSkillSelectionHTML(actor, target, skills) {
+    const skillsHTML = skills.map(
+      (skill, index) => `<div>
+        <input type="radio" name="selectedSkill" value="${skill.key}" id="skill-${index}" ${index === 0 ? "checked" : ""}>
+        <label for="skill-${index}">${skill.name} (+${skill.modifier})</label>
+      </div>`
+    ).join("");
+    return `
+      <div class="recall-knowledge-skill-selection">
+        <p>Select a knowledge skill to use against <strong>${target.name}</strong>:</p>
+        
+        <div class="form-group">
+          <div class="skill-selection">
+            ${skillsHTML}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  /**
+   * Generate HTML for information selection dialog
+   */
+  generateInformationSelectionHTML(target, result) {
+    const infoHTML = result.availableInfo.map(
+      (info, index) => `<div>
+        <input type="checkbox" name="selectedInfo" value="${index}" id="info-${index}" checked>
+        <label for="info-${index}">
+          <strong>${info.label}:</strong> ${info.value}
+          ${info.gmOnly ? " <em>(GM Only)</em>" : ""}
+        </label>
+      </div>`
+    ).join("");
+    return `
+      <div class="recall-knowledge-info-selection">
+        <p>Choose what to reveal from the <strong>${result.degree}</strong> recall knowledge check:</p>
+        
+        <div class="form-group">
+          <div class="info-selection">
+            ${infoHTML}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+}
+class RulesEngine {
+  constructor() {
+    __publicField(this, "ruleElements", /* @__PURE__ */ new Map());
+    __publicField(this, "processors", /* @__PURE__ */ new Map());
+  }
+  /**
+   * Initialize the rules engine
+   */
+  async initialize() {
+    console.log(`${MODULE_ID} | Initializing Rules Engine`);
+    this.registerProcessor("knowledge", this.processKnowledgeRule.bind(this));
+    this.registerProcessor("modifier", this.processModifierRule.bind(this));
+    this.setupRuleHooks();
+  }
+  /**
+   * Register a rule processor
+   */
+  registerProcessor(type, processor) {
+    this.processors.set(type, processor);
+    console.log(`${MODULE_ID} | Registered processor for rule type: ${type}`);
+  }
+  /**
+   * Add a rule element
+   */
+  addRuleElement(element) {
+    this.ruleElements.set(element.key, element);
+    this.processRuleElement(element);
+  }
+  /**
+   * Remove a rule element
+   */
+  removeRuleElement(key) {
+    return this.ruleElements.delete(key);
+  }
+  /**
+   * Get a rule element by key
+   */
+  getRuleElement(key) {
+    return this.ruleElements.get(key);
+  }
+  /**
+   * Get all rule elements
+   */
+  getAllRuleElements() {
+    return Array.from(this.ruleElements.values());
+  }
+  /**
+   * Process a rule element based on its type
+   */
+  processRuleElement(element) {
+    const processor = this.processors.get(element.key.split(".")[0]);
+    if (processor) {
+      processor(element);
+    }
+  }
+  /**
+   * Process knowledge rule elements
+   */
+  processKnowledgeRule(element) {
+    const knowledgeRule = element;
+    console.log(`${MODULE_ID} | Processing knowledge rule: ${knowledgeRule.label}`);
+  }
+  /**
+   * Process modifier rule elements
+   */
+  processModifierRule(element) {
+    const modifierRule = element;
+    console.log(`${MODULE_ID} | Processing modifier rule: ${modifierRule.label}`);
+  }
+  /**
+   * Setup hooks for rule processing
+   */
+  setupRuleHooks() {
+    Hooks.on("preUpdateActor", (actor, updateData) => {
+      this.processActorRules(actor, updateData);
+    });
+    Hooks.on("preUpdateItem", (item, updateData) => {
+      this.processItemRules(item, updateData);
+    });
+  }
+  /**
+   * Process rules for actor updates
+   */
+  processActorRules(actor, updateData) {
+    const actorRules = this.getRulesForActor(actor);
+    actorRules.forEach((rule) => this.processRuleElement(rule));
+  }
+  /**
+   * Process rules for item updates
+   */
+  processItemRules(item, updateData) {
+    const itemRules = this.getRulesForItem(item);
+    itemRules.forEach((rule) => this.processRuleElement(rule));
+  }
+  /**
+   * Get rule elements that apply to a specific actor
+   */
+  getRulesForActor(actor) {
+    return this.getAllRuleElements().filter((rule) => {
+      return this.evaluatePredicate(rule.predicate, actor);
+    });
+  }
+  /**
+   * Get rule elements that apply to a specific item
+   */
+  getRulesForItem(item) {
+    return this.getAllRuleElements().filter((rule) => {
+      return this.evaluatePredicate(rule.predicate, item);
+    });
+  }
+  /**
+   * Evaluate a predicate against a given context
+   */
+  evaluatePredicate(predicate, context) {
+    if (!predicate || predicate.length === 0) {
+      return true;
+    }
+    return predicate.every((condition) => {
+      return true;
+    });
+  }
+  /**
+   * Create a sample knowledge rule element
+   */
+  createSampleKnowledgeRule() {
+    return {
+      key: "knowledge.sample",
+      label: "Sample Knowledge Check",
+      selector: "check",
+      dc: 15,
+      type: "arcana",
+      priority: 10,
+      success: "You recall basic information about this creature.",
+      criticalSuccess: "You recall detailed information about this creature's abilities and weaknesses.",
+      failure: "You cannot recall anything useful about this creature.",
+      criticalFailure: "You recall false information about this creature."
+    };
+  }
+  /**
+   * Create a sample modifier rule element
+   */
+  createSampleModifierRule() {
+    return {
+      key: "modifier.sample",
+      label: "Sample Knowledge Bonus",
+      selector: "skill-check",
+      type: "circumstance",
+      value: 2,
+      priority: 20,
+      predicate: ["action:recall-knowledge"]
+    };
+  }
+}
+class RecallKnowledgeSettings {
+  /**
+   * Register all module settings
+   */
+  async register() {
+    console.log(`${MODULE_ID} | Registering module settings`);
+    game.settings.register(MODULE_ID, "enableRulesEngine", {
+      name: "recall-knowledge.settings.enableRulesEngine.name",
+      hint: "recall-knowledge.settings.enableRulesEngine.hint",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: true,
+      requiresReload: true
+    });
+    game.settings.register(MODULE_ID, "debugMode", {
+      name: "recall-knowledge.settings.debugMode.name",
+      hint: "recall-knowledge.settings.debugMode.hint",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: false
+    });
+    game.settings.register(MODULE_ID, "autoRollKnowledge", {
+      name: "recall-knowledge.settings.autoRollKnowledge.name",
+      hint: "recall-knowledge.settings.autoRollKnowledge.hint",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: false
+    });
+    game.settings.register(MODULE_ID, "maxKnowledgeAttempts", {
+      name: "recall-knowledge.settings.maxKnowledgeAttempts.name",
+      hint: "recall-knowledge.settings.maxKnowledgeAttempts.hint",
+      scope: "world",
+      config: true,
+      type: Number,
+      default: 1,
+      range: {
+        min: 1,
+        max: 10,
+        step: 1
+      }
+    });
+    game.settings.register(MODULE_ID, "chatOutputStyle", {
+      name: "recall-knowledge.settings.chatOutputStyle.name",
+      hint: "recall-knowledge.settings.chatOutputStyle.hint",
+      scope: "world",
+      config: true,
+      type: String,
+      default: "detailed",
+      choices: {
+        "simple": "recall-knowledge.settings.chatOutputStyle.simple",
+        "detailed": "recall-knowledge.settings.chatOutputStyle.detailed",
+        "whisper": "recall-knowledge.settings.chatOutputStyle.whisper"
+      }
+    });
+    game.settings.register(MODULE_ID, "requireGMApproval", {
+      name: "recall-knowledge.settings.requireGMApproval.name",
+      hint: "recall-knowledge.settings.requireGMApproval.hint",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: true
+    });
+    game.settings.register(MODULE_ID, "revealableInfo", {
+      name: "recall-knowledge.settings.revealableInfo.name",
+      hint: "recall-knowledge.settings.revealableInfo.hint",
+      scope: "world",
+      config: true,
+      type: Object,
+      default: {
+        basicInfo: { visible: true, gmOnly: false },
+        // Name, type, size
+        abilities: { visible: true, gmOnly: false },
+        // Abilities and scores
+        skills: { visible: true, gmOnly: true },
+        // Skill bonuses
+        saves: { visible: true, gmOnly: false },
+        // Saving throws
+        ac: { visible: true, gmOnly: false },
+        // Armor class
+        hp: { visible: false, gmOnly: true },
+        // Hit points
+        resistances: { visible: true, gmOnly: false },
+        // Resistances/immunities
+        weaknesses: { visible: true, gmOnly: false },
+        // Weaknesses
+        attacks: { visible: true, gmOnly: true },
+        // Attack bonuses
+        spells: { visible: true, gmOnly: true },
+        // Spell information
+        traits: { visible: true, gmOnly: false },
+        // Creature traits
+        lore: { visible: true, gmOnly: false }
+        // Lore and background
+      }
+    });
+    game.settings.register(MODULE_ID, "autoCalculateDC", {
+      name: "recall-knowledge.settings.autoCalculateDC.name",
+      hint: "recall-knowledge.settings.autoCalculateDC.hint",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: true
+    });
+    game.settings.register(MODULE_ID, "dcCalculationMethod", {
+      name: "recall-knowledge.settings.dcCalculationMethod.name",
+      hint: "recall-knowledge.settings.dcCalculationMethod.hint",
+      scope: "world",
+      config: true,
+      type: String,
+      default: "level",
+      choices: {
+        "level": "recall-knowledge.settings.dcCalculationMethod.level",
+        "cr": "recall-knowledge.settings.dcCalculationMethod.cr",
+        "custom": "recall-knowledge.settings.dcCalculationMethod.custom"
+      }
+    });
+    game.settings.register(MODULE_ID, "includeLoreSkills", {
+      name: "recall-knowledge.settings.includeLoreSkills.name",
+      hint: "recall-knowledge.settings.includeLoreSkills.hint",
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: true
+    });
+  }
+  /**
+  * Get a setting value
+  */
+  getSetting(key) {
+    return game.settings.get(MODULE_ID, key);
+  }
+  /**
+   * Set a setting value
+   */
+  async setSetting(key, value) {
+    return game.settings.set(MODULE_ID, key, value);
+  }
+  /**
+   * Check if rules engine is enabled
+   */
+  isRulesEngineEnabled() {
+    return this.getSetting("enableRulesEngine");
+  }
+  /**
+   * Check if debug mode is enabled
+   */
+  isDebugMode() {
+    return this.getSetting("debugMode");
+  }
+  /**
+   * Check if GM approval is required for recall knowledge checks
+   */
+  requiresGMApproval() {
+    return this.getSetting("requireGMApproval");
+  }
+  /**
+   * Get revealable information settings
+   */
+  getRevealableInfo() {
+    return this.getSetting("revealableInfo");
+  }
+  /**
+   * Check if DC should be auto-calculated
+   */
+  shouldAutoCalculateDC() {
+    return this.getSetting("autoCalculateDC");
+  }
+  /**
+   * Get DC calculation method
+   */
+  getDCCalculationMethod() {
+    return this.getSetting("dcCalculationMethod");
+  }
+  /**
+   * Check if lore skills should be included
+   */
+  shouldIncludeLoreSkills() {
+    return this.getSetting("includeLoreSkills");
+  }
+}
+class SocketHandler {
+  constructor() {
+    __publicField(this, "socketName");
+    __publicField(this, "messageHandlers", /* @__PURE__ */ new Map());
+    this.socketName = `module.${MODULE_ID}`;
+  }
+  /**
+   * Initialize socket handling
+   */
+  initialize() {
+    console.log(`${MODULE_ID} | Initializing socket handler`);
+    game.socket.on(this.socketName, (message) => {
+      this.handleSocketMessage(message);
+    });
+    this.registerHandlers();
+  }
+  /**
+   * Register message handlers
+   */
+  registerHandlers() {
+    this.messageHandlers.set("knowledgeCheck", this.handleKnowledgeCheck.bind(this));
+    this.messageHandlers.set("shareKnowledge", this.handleShareKnowledge.bind(this));
+    this.messageHandlers.set("updateRules", this.handleUpdateRules.bind(this));
+    this.messageHandlers.set("syncData", this.handleSyncData.bind(this));
+    this.messageHandlers.set("gmApprovalRequest", this.handleGMApprovalRequest.bind(this));
+    this.messageHandlers.set("recallKnowledgeResult", this.handleRecallKnowledgeResult.bind(this));
+    this.messageHandlers.set("recallKnowledgeDenied", this.handleRecallKnowledgeDenied.bind(this));
+  }
+  /**
+   * Send a socket message
+   */
+  sendMessage(type, data, targets) {
+    const message = {
+      type,
+      data,
+      sender: game.user.id,
+      timestamp: Date.now()
+    };
+    if (targets && targets.length > 0) {
+      targets.forEach((userId) => {
+        game.socket.emit(this.socketName, message, userId);
+      });
+    } else {
+      game.socket.emit(this.socketName, message);
+    }
+    console.log(`${MODULE_ID} | Sent socket message: ${type}`, data);
+  }
+  /**
+   * Handle incoming socket messages
+   */
+  handleSocketMessage(message) {
+    console.log(`${MODULE_ID} | Received socket message: ${message.type}`, message);
+    if (message.sender === game.user.id) {
+      return;
+    }
+    const handler = this.messageHandlers.get(message.type);
+    if (handler) {
+      handler(message);
+    } else {
+      console.warn(`${MODULE_ID} | No handler registered for message type: ${message.type}`);
+    }
+  }
+  // =============================================================================
+  // Message Handlers
+  // =============================================================================
+  /**
+   * Handle knowledge check messages
+   */
+  handleKnowledgeCheck(message) {
+    const { actorId, checkType, result } = message.data;
+    console.log(`${MODULE_ID} | Processing knowledge check from ${message.sender}`);
+    this.processRemoteKnowledgeCheck(actorId, checkType, result);
+  }
+  /**
+   * Handle share knowledge messages
+   */
+  handleShareKnowledge(message) {
+    const { knowledge, targetActorId } = message.data;
+    console.log(`${MODULE_ID} | Received shared knowledge from ${message.sender}`);
+    this.displaySharedKnowledge(knowledge, targetActorId);
+  }
+  /**
+   * Handle rule update messages
+   */
+  handleUpdateRules(message) {
+    const { ruleElement, action } = message.data;
+    console.log(`${MODULE_ID} | Received rule update from ${message.sender}`);
+    this.updateLocalRules(ruleElement, action);
+  }
+  /**
+   * Handle sync data messages
+   */
+  handleSyncData(message) {
+    const { dataType, syncData } = message.data;
+    console.log(`${MODULE_ID} | Received sync data from ${message.sender}`);
+    this.synchronizeData(dataType, syncData);
+  }
+  // =============================================================================
+  // Utility Methods
+  // =============================================================================
+  /**
+   * Send a knowledge check result to other players
+   */
+  shareKnowledgeCheck(actorId, checkType, result) {
+    this.sendMessage("knowledgeCheck", {
+      actorId,
+      checkType,
+      result
+    });
+  }
+  /**
+   * Share knowledge information with specific players
+   */
+  shareKnowledge(knowledge, targetActorId, targets) {
+    this.sendMessage("shareKnowledge", {
+      knowledge,
+      targetActorId
+    }, targets);
+  }
+  /**
+   * Broadcast rule element updates
+   */
+  updateRules(ruleElement, action) {
+    if (!game.user.isGM) {
+      return;
+    }
+    this.sendMessage("updateRules", {
+      ruleElement,
+      action
+    });
+  }
+  /**
+   * Request data synchronization
+   */
+  requestSync(dataType) {
+    this.sendMessage("syncData", {
+      dataType,
+      request: true
+    });
+  }
+  /**
+   * Send synchronization data
+   */
+  sendSyncData(dataType, syncData, targets) {
+    this.sendMessage("syncData", {
+      dataType,
+      syncData,
+      request: false
+    }, targets);
+  }
+  // =============================================================================
+  // Processing Methods
+  // =============================================================================
+  /**
+   * Process a remote knowledge check
+   */
+  processRemoteKnowledgeCheck(actorId, checkType, result) {
+    const actor = game.actors.get(actorId);
+    if (!actor) {
+      console.warn(`${MODULE_ID} | Actor not found for knowledge check: ${actorId}`);
+      return;
+    }
+    ui.notifications.info(`Knowledge check performed on ${actor.name} by another player`);
+  }
+  /**
+   * Display shared knowledge to the user
+   */
+  displaySharedKnowledge(knowledge, targetActorId) {
+    const actor = game.actors.get(targetActorId);
+    if (!actor) {
+      return;
+    }
+  }
+  /**
+   * Update local rules based on remote changes
+   */
+  updateLocalRules(ruleElement, action) {
+  }
+  /**
+   * Synchronize data with remote clients
+   */
+  synchronizeData(dataType, syncData) {
+  }
+  /**
+   * Check if user has permission for socket operations
+   */
+  hasPermission(operation) {
+    switch (operation) {
+      case "shareKnowledge":
+        return true;
+      case "updateRules":
+        return game.user.isGM;
+      default:
+        return false;
+    }
+  }
+  /**
+   * Handle GM approval request messages
+   */
+  handleGMApprovalRequest(message) {
+    var _a, _b;
+    if (!game.user.isGM) return;
+    const recallKnowledgeManager = (_b = (_a = globalThis.RecallKnowledge) == null ? void 0 : _a.module) == null ? void 0 : _b.recallKnowledgeManager;
+    if (recallKnowledgeManager) {
+      recallKnowledgeManager.showGMApprovalDialog(message.data);
+    }
+  }
+  /**
+   * Handle recall knowledge result messages
+   */
+  handleRecallKnowledgeResult(message) {
+    const { result } = message.data;
+    if (result.success) {
+      ui.notifications.info(`Recall Knowledge ${result.degree}: You learned something!`);
+    } else {
+      ui.notifications.warn(`Recall Knowledge ${result.degree}: You couldn't recall anything useful.`);
+    }
+  }
+  /**
+   * Handle recall knowledge denied messages
+   */
+  handleRecallKnowledgeDenied(message) {
+    const { reason } = message.data;
+    ui.notifications.warn(`Recall Knowledge request denied: ${reason || "GM denied the request"}`);
+  }
+}
+const _RecallKnowledgeModule = class _RecallKnowledgeModule {
+  constructor() {
+    __publicField(this, "settings");
+    __publicField(this, "rulesEngine");
+    __publicField(this, "hookManager");
+    __publicField(this, "socketHandler");
+    __publicField(this, "api");
+    __publicField(this, "recallKnowledgeManager");
+    if (_RecallKnowledgeModule.instance) {
+      return _RecallKnowledgeModule.instance;
+    }
+    _RecallKnowledgeModule.instance = this;
+    this.settings = new RecallKnowledgeSettings();
+    this.rulesEngine = new RulesEngine();
+    this.hookManager = new HookManager();
+    this.socketHandler = new SocketHandler();
+    this.api = new ModuleAPI();
+    this.recallKnowledgeManager = new RecallKnowledgeManager();
+  }
+  /**
+   * Initialize the module
+   */
+  async initialize() {
+    console.log(`${MODULE_TITLE} | Initializing module...`);
+    try {
+      await this.settings.register();
+      await this.rulesEngine.initialize();
+      this.hookManager.setupHooks();
+      this.socketHandler.initialize();
+      this.api.setComponents(this.rulesEngine, this.socketHandler, this.settings);
+      this.api.setupAPI();
+      console.log(`${MODULE_TITLE} | Module initialized successfully`);
+    } catch (error) {
+      console.error(`${MODULE_TITLE} | Error during initialization:`, error);
+    }
+  }
+  /**
+   * Get the module instance
+   */
+  static getInstance() {
+    if (!_RecallKnowledgeModule.instance) {
+      _RecallKnowledgeModule.instance = new _RecallKnowledgeModule();
+    }
+    return _RecallKnowledgeModule.instance;
+  }
+  /**
+   * Get the recall knowledge manager
+   */
+  getRecallKnowledgeManager() {
+    return this.recallKnowledgeManager;
+  }
+};
+__publicField(_RecallKnowledgeModule, "instance");
+let RecallKnowledgeModule = _RecallKnowledgeModule;
+Hooks.once("init", async () => {
+  const module = RecallKnowledgeModule.getInstance();
+  await module.initialize();
 });
-
-console.log('Recall Knowledge module loaded');
+Hooks.once("ready", () => {
+  console.log(`${MODULE_TITLE} | Module ready`);
+  const moduleInstance = RecallKnowledgeModule.getInstance();
+  globalThis.RecallKnowledge = {
+    module: moduleInstance,
+    recallKnowledgeManager: moduleInstance.getRecallKnowledgeManager(),
+    MODULE_ID,
+    MODULE_TITLE
+  };
+});
+//# sourceMappingURL=recall-knowledge.js.map
