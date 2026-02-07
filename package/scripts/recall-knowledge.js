@@ -608,11 +608,7 @@ class RecallKnowledgeManager {
    */
   async showSkillSelectionDialog(actor, target) {
     const availableSkills = this.getAvailableSkills(actor);
-    const content = await renderTemplate("modules/recall-knowledge/templates/skill-selection.hbs", {
-      actor,
-      target,
-      skills: availableSkills
-    });
+    const content = this.generateSkillSelectionHTML(actor, target, availableSkills);
     new Dialog({
       title: game.i18n.localize("recall-knowledge.ui.knowledgeCheck.title"),
       content,
@@ -676,11 +672,7 @@ class RecallKnowledgeManager {
    * Show information selection dialog to GM
    */
   async showInformationSelectionDialog(target, result, playerId) {
-    const content = await renderTemplate("modules/recall-knowledge/templates/information-selection.hbs", {
-      target,
-      result,
-      information: result.availableInfo
-    });
+    const content = this.generateInformationSelectionHTML(target, result);
     new Dialog({
       title: game.i18n.localize("recall-knowledge.ui.informationReveal.title"),
       content,
