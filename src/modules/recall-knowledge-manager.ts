@@ -4,6 +4,7 @@
  */
 
 
+
 export interface RecallKnowledgeRequest {
     id: string;
     playerId: string;
@@ -59,7 +60,8 @@ export class RecallKnowledgeManager {
         const settings = (game as any).RecallKnowledge?.settings;
         if (settings?.requiresGMApproval() && !game.user.isGM) {
             await this.requestGMApproval(actor, target);
-        } else {
+        }
+        else {
             // Direct roll without GM approval
             await this.showSkillSelectionDialog(actor, target);
         }
@@ -180,11 +182,7 @@ export class RecallKnowledgeManager {
     private async showSkillSelectionDialog(actor: any, target: any): Promise<void> {
         const availableSkills = this.getAvailableSkills(actor);
 
-        const content = await renderTemplate('modules/recall-knowledge/templates/skill-selection.hbs', {
-            actor,
-            target,
-            skills: availableSkills
-        });
+        const content = this.generateSkillSelectionHTML(actor, target, availableSkills);
 
         new Dialog({
             title: game.i18n.localize('recall-knowledge.ui.knowledgeCheck.title'),
@@ -273,11 +271,8 @@ export class RecallKnowledgeManager {
         result: RecallKnowledgeResult,
         playerId?: string
     ): Promise<void> {
-        const content = await renderTemplate('modules/recall-knowledge/templates/information-selection.hbs', {
-            target,
-            result,
-            information: result.availableInfo
-        });
+
+        const content = this.generateInformationSelectionHTML(target, result);
 
         new Dialog({
             title: game.i18n.localize('recall-knowledge.ui.informationReveal.title'),
